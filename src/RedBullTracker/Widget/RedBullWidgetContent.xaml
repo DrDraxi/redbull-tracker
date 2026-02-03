@@ -6,15 +6,19 @@
 
     <Border x:Name="RootBorder"
             Background="Transparent"
-            CornerRadius="4"
-            Padding="4,2">
-        <ToolTipService.ToolTip>
-            <ToolTip x:Name="CountToolTip" Content="Red Bulls: 0&#x0a;Left-click: Remove | Right-click: Add" />
-        </ToolTipService.ToolTip>
+            Padding="0,4">
+        <Border x:Name="HoverBorder"
+                Background="Transparent"
+                CornerRadius="4"
+                Padding="4,2">
+            <ToolTipService.ToolTip>
+                <ToolTip x:Name="CountToolTip" Content="Red Bulls: 0&#x0a;Left-click: Remove | Right-click: Add" />
+            </ToolTipService.ToolTip>
 
-        <StackPanel x:Name="CansPanel"
-                    Orientation="Horizontal"
-                    Spacing="2"
-                    VerticalAlignment="Center" />
+            <StackPanel x:Name="CansPanel"
+                        Orientation="Horizontal"
+                        Spacing="2"
+                        VerticalAlignment="Center" />
+        </Border>
     </Border>
 </UserControl>

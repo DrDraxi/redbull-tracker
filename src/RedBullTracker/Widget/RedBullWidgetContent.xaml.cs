@@ -24,9 +24,9 @@ public sealed partial class RedBullWidgetContent : UserControl
     public RedBullWidgetContent()
     {
         InitializeComponent();
-        RootBorder.PointerPressed += OnPointerPressed;
-        RootBorder.PointerEntered += OnPointerEntered;
-        RootBorder.PointerExited += OnPointerExited;
+        HoverBorder.PointerPressed += OnPointerPressed;
+        HoverBorder.PointerEntered += OnPointerEntered;
+        HoverBorder.PointerExited += OnPointerExited;
     }
 
     public void SetCanType(string canType)
@@ -122,11 +122,11 @@ public sealed partial class RedBullWidgetContent : UserControl
 
     private void OnPointerEntered(object sender, PointerRoutedEventArgs e)
     {
-        RootBorder.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(40, 255, 255, 255));
+        HoverBorder.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(20, 255, 255, 255));
     }
 
     private void OnPointerExited(object sender, PointerRoutedEventArgs e)
     {
-        RootBorder.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0, 0, 0, 0));
+        HoverBorder.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0, 0, 0, 0));
     }
 }
