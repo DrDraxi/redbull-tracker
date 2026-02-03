@@ -1,0 +1,136 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    env:
+      PLATFORM: x64
+      RID: win-x64
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore RedBullTracker.sln
+
+      - name: Get version from tag
+        id: version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if ($tag -match '^v?(.+)$') { $version = $Matches[1] } else { $version = "0.0.0" }
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "TAG=$tag" >> $env:GITHUB_OUTPUT
+
+      - name: Extract changelog for this version
+        id: changelog
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $changelogFile = "CHANGELOG.md"
+
+          if (Test-Path $changelogFile) {
+            $content = Get-Content $changelogFile -Raw
+
+            # Extract section for this version (between ## [vX.X.X] and next ## [)
+            $pattern = "(?s)## \[$tag\].*?(?=\n## \[|$)"
+            if ($content -match $pattern) {
+              $section = $Matches[0]
+              # Remove the header line, keep just the content
+              $section = $section -replace "^## \[$tag\].*?\n", ""
+              $section = $section.Trim()
+            } else {
+              $section = "Release $tag"
+            }
+          } else {
+            $section = "Release $tag"
+          }
+
+          # Write to file for multi-line support
+          $section | Out-File -FilePath "release_notes.txt" -Encoding utf8
+
+      # 1. Build portable single-file exe
+      - name: Publish Single File exe
+        run: |
+          dotnet publish src/RedBullTracker/RedBullTracker.csproj `
+            --configuration Release `
+            --runtime ${{ env.RID }} `
+            --self-contained true `
+            -p:Platform=${{ env.PLATFORM }} `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:WindowsPackageType=None `
+            -p:Version=${{ steps.version.outputs.VERSION }} `
+            -o publish/single
+
+      - name: Rename exe
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if (-not $tag) { $tag = "dev" }
+          $asset = "RedBullTracker-$tag-${{ env.RID }}.exe"
+          Copy-Item "publish/single/RedBullTracker.exe" -Destination $asset
+          echo "EXE_ASSET=$asset" >> $env:GITHUB_OUTPUT
+        id: pkg-exe
+
+      # 2. Build portable zip (all files)
+      - name: Publish for Zip
+        run: |
+          dotnet publish src/RedBullTracker/RedBullTracker.csproj `
+            --configuration Release `
+            --runtime ${{ env.RID }} `
+            --self-contained true `
+            -p:Platform=${{ env.PLATFORM }} `
+            -p:PublishSingleFile=false `
+            -p:WindowsPackageType=None `
+            -p:Version=${{ steps.version.outputs.VERSION }} `
+            -o publish/zip
+
+      - name: Package Zip
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if (-not $tag) { $tag = "dev" }
+          $asset = "RedBullTracker-$tag-${{ env.RID }}.zip"
+          Compress-Archive -Path "publish/zip/*" -DestinationPath $asset
+          echo "ZIP_ASSET=$asset" >> $env:GITHUB_OUTPUT
+        id: pkg-zip
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $exe = "${{ steps.pkg-exe.outputs.EXE_ASSET }}"
+          $zip = "${{ steps.pkg-zip.outputs.ZIP_ASSET }}"
+          $notes = Get-Content "release_notes.txt" -Raw
+
+          # Create release with notes from changelog
+          gh release create $tag $exe $zip --title "$tag" --notes "$notes"
+
+      - name: Upload workflow artifacts
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: redbulltracker-${{ env.RID }}
+          path: |
+            ${{ steps.pkg-exe.outputs.EXE_ASSET }}
+            ${{ steps.pkg-zip.outputs.ZIP_ASSET }}

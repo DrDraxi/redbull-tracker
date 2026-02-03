@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: ["*"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      PLATFORM: x64
+      RID: win-x64
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+
+      - name: Determine version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.ref }}" -match "^refs/tags/v(.+)$") {
+            $version = $matches[1]
+          } else {
+            $version = "0.0.0-dev"
+          }
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Version: $version"
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore RedBullTracker.sln
+
+      - name: Build (Debug)
+        run: dotnet build RedBullTracker.sln --configuration Debug --no-restore
+
+      - name: Publish Single File (Release x64)
+        run: |
+          dotnet publish src/RedBullTracker/RedBullTracker.csproj `
+            --configuration Release `
+            --runtime ${{ env.RID }} `
+            --self-contained true `
+            -p:Platform=${{ env.PLATFORM }} `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:WindowsPackageType=None `
+            -p:Version=${{ steps.version.outputs.VERSION }} `
+            -o publish/${{ env.RID }}
+
+      - name: Upload Portable exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: RedBullTracker-portable-${{ env.RID }}
+          path: publish/${{ env.RID }}/RedBullTracker.exe
+          retention-days: 3
