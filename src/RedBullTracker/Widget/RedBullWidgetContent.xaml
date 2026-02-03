@@ -6,7 +6,7 @@
 
     <Border x:Name="RootBorder"
             Background="Transparent"
-            Padding="0,4">
+            Padding="0,2">
         <Border x:Name="HoverBorder"
                 Background="Transparent"
                 CornerRadius="4"
