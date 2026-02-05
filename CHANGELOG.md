@@ -7,10 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [v1.1.1] - 2026-02-05
+## [v1.2.1] - 2026-02-05
 
 ### Changed
 - Reduced hoverable area height with 4px margin for better taskbar fit
+
+## [v1.2.0] - 2026-02-03
+
+### Changed
+- Adjusted vertical padding for better taskbar fit
 
 ## [v1.1.0] - 2026-02-03
 
