@@ -5,11 +5,11 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <Border x:Name="RootBorder"
-            Background="Transparent"
-            Padding="0,2">
+            Background="Transparent">
         <Border x:Name="HoverBorder"
                 Background="Transparent"
                 CornerRadius="4"
+                Margin="0,4"
                 Padding="4,2">
             <ToolTipService.ToolTip>
                 <ToolTip x:Name="CountToolTip" Content="Red Bulls: 0&#x0a;Left-click: Remove | Right-click: Add" />
