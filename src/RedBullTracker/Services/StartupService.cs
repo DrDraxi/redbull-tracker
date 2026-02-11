@@ -52,10 +52,15 @@ public static class StartupService
     /// </summary>
     public static void SyncWithConfig(bool startWithWindows)
     {
-        var currentState = IsStartupEnabled();
-        if (currentState != startWithWindows)
+        // Always call SetStartupEnabled when enabled to update the exe path
+        // in case the app was moved to a new location
+        if (startWithWindows)
         {
-            SetStartupEnabled(startWithWindows);
+            SetStartupEnabled(true);
+        }
+        else if (IsStartupEnabled())
+        {
+            SetStartupEnabled(false);
         }
     }
 }

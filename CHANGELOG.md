@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.2.2] - 2026-02-11
+
+### Fixed
+- Startup registry path now updates when app is moved to a new location
+
 ## [v1.2.1] - 2026-02-05
 
 ### Changed
