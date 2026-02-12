@@ -5,7 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [v2.0.0] - 2026-02-12
+
+### Changed
+- Replaced WinUI 3 / Windows App SDK with pure Win32 GDI rendering (~10 MB exe vs ~153 MB)
+- Widget rendering now uses `TaskbarWidget.Widget` API with immediate-mode GDI
+- No runtime prerequisites needed (removed WinUI 3 framework dependency)
+
+### Added
+- Drag-to-reorder support — reorder widgets by dragging
+- Cross-widget atomic repositioning when widget resizes
+
+### Removed
+- All XAML files (`App.xaml`, `MainWindow.xaml`, `RedBullWidgetContent.xaml`)
+- `Microsoft.WindowsAppSDK` and `Microsoft.Windows.SDK.BuildTools` NuGet dependencies
+- `OnlineRedBullService` (unused placeholder)
 
 ## [v1.2.2] - 2026-02-11
 

@@ -1,8 +1,5 @@
-using System;
-using System.Runtime.InteropServices;
-using Microsoft.UI.Dispatching;
-using Microsoft.UI.Xaml;
-using WinRT;
+using RedBullTracker.Services;
+using RedBullTracker.Widget;
 
 namespace RedBullTracker;
 
@@ -11,12 +8,14 @@ public static class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        ComWrappersSupport.InitializeComWrappers();
-        Application.Start(p =>
-        {
-            var context = new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread());
-            SynchronizationContext.SetSynchronizationContext(context);
-            _ = new App();
-        });
+        var settings = new SettingsService();
+        var service = new OfflineRedBullService(settings);
+
+        StartupService.SyncWithConfig(settings.Config.StartWithWindows);
+
+        var widget = new RedBullWidget(service, settings.Config.CanType);
+        widget.Initialize();
+
+        TaskbarWidget.Widget.RunMessageLoop();
     }
 }

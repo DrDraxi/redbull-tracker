@@ -1,22 +1,20 @@
-using Microsoft.UI;
-using Microsoft.UI.Content;
-using Microsoft.UI.Xaml.Hosting;
-using Microsoft.UI.Xaml.Media;
 using RedBullTracker.Services;
 using TaskbarWidget;
+using TaskbarWidget.Rendering;
 
 namespace RedBullTracker.Widget;
 
 public class RedBullWidget : IDisposable
 {
-    private const string WidgetClassName = "RedBullTrackerTaskbarWidget";
-    private const int MinWidthDip = 32;
+    private const int CanWidthDip = 12;
+    private const int CanHeightDip = 24;
+    private const int CanSpacing = 2;
 
     private readonly IRedBullService _service;
     private readonly string _canType;
-    private TaskbarInjectionHelper? _injectionHelper;
-    private DesktopWindowXamlSource? _xamlSource;
-    private RedBullWidgetContent? _content;
+    private TaskbarWidget.Widget? _widget;
+    private WidgetImage? _canImage;
+    private WidgetImage? _emptyImage;
     private bool _disposed;
 
     public RedBullWidget(IRedBullService service, string canType = "default")
@@ -28,96 +26,57 @@ public class RedBullWidget : IDisposable
 
     public void Initialize()
     {
-        // Calculate initial width based on current count
-        var initialWidth = CalculateWidth(_service.Count);
+        LoadImages();
 
-        var config = new TaskbarInjectionConfig
+        _widget = new TaskbarWidget.Widget("RedBull", render: ctx =>
         {
-            ClassName = WidgetClassName,
-            WindowTitle = "RedBullTracker",
-            WidthDip = initialWidth,
-            DeferInjection = true
-        };
+            ctx.Panel(p =>
+            {
+                int count = _service.Count;
 
-        _injectionHelper = new TaskbarInjectionHelper(config);
-        var result = _injectionHelper.Initialize();
+                p.Horizontal(CanSpacing, h =>
+                {
+                    if (count == 0)
+                    {
+                        h.DrawImage(_emptyImage!, widthDip: CanWidthDip, heightDip: CanHeightDip);
+                    }
+                    else
+                    {
+                        for (int i = 0; i < count; i++)
+                            h.DrawImage(_canImage!, widthDip: CanWidthDip, heightDip: CanHeightDip);
+                    }
+                });
 
-        if (!result.Success || result.WindowHandle == IntPtr.Zero)
-        {
-            return;
-        }
+                p.OnClick(() => _ = _service.RemoveCanAsync());
+                p.OnRightClick(() => _ = _service.AddCanAsync());
+                p.Tooltip($"Red Bulls: {count}\nLeft-click: Remove | Right-click: Add");
+            });
+        });
 
-        var windowId = Win32Interop.GetWindowIdFromWindow(result.WindowHandle);
-        _xamlSource = new DesktopWindowXamlSource();
-        _xamlSource.Initialize(windowId);
-        _xamlSource.SiteBridge.ResizePolicy = ContentSizePolicy.ResizeContentToParentWindow;
-
-        _content = new RedBullWidgetContent();
-        _content.SetCanType(_canType);
-        _content.LeftClicked += OnLeftClicked;
-        _content.RightClicked += OnRightClicked;
-        _content.WidthChanged += OnWidthChanged;
-        _content.UpdateCount(_service.Count);
-
-        var rootGrid = new Microsoft.UI.Xaml.Controls.Grid
-        {
-            Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0, 0, 0, 0))
-        };
-        rootGrid.Children.Add(_content);
-
-        _xamlSource.Content = rootGrid;
-        _injectionHelper.Inject();
-        _injectionHelper.Show();
+        _widget.Show();
     }
 
-    private int CalculateWidth(int count)
+    private void LoadImages()
     {
-        if (count == 0)
-        {
-            return MinWidthDip;
-        }
-        // 12px per can + 2px spacing between cans + padding
-        return Math.Max(MinWidthDip, (count * 12) + ((count - 1) * 2) + 12);
-    }
+        var basePath = AppContext.BaseDirectory;
+        var canFileName = _canType?.ToLowerInvariant() == "sugarfree"
+            ? "redbull-sugarfree.png"
+            : "redbull-default.png";
 
-    private void OnWidthChanged(object? sender, int newWidth)
-    {
-        _injectionHelper?.Resize(Math.Max(MinWidthDip, newWidth));
+        _canImage = WidgetImage.FromFile(Path.Combine(basePath, "Assets", canFileName));
+        _emptyImage = WidgetImage.FromFile(Path.Combine(basePath, "Assets", "redbull-empty.png"));
     }
 
     private void OnCountChanged(object? sender, EventArgs e)
     {
-        _content?.DispatcherQueue?.TryEnqueue(() =>
-        {
-            _content?.UpdateCount(_service.Count);
-        });
-    }
-
-    private async void OnLeftClicked(object? sender, EventArgs e)
-    {
-        await _service.RemoveCanAsync();
-    }
-
-    private async void OnRightClicked(object? sender, EventArgs e)
-    {
-        await _service.AddCanAsync();
+        _widget?.Invalidate();
     }
 
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
-
         _service.CountChanged -= OnCountChanged;
-
-        if (_content != null)
-        {
-            _content.LeftClicked -= OnLeftClicked;
-            _content.RightClicked -= OnRightClicked;
-            _content.WidthChanged -= OnWidthChanged;
-        }
-
-        _xamlSource?.Dispose();
-        _injectionHelper?.Dispose();
+        _widget?.Dispose();
     }
 }
