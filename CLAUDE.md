@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-RedBull Tracker is a Windows taskbar widget that tracks Red Bull consumption. It displays cans visually in the taskbar, allowing quick add/remove with mouse clicks. Supports offline mode with local persistence and configurable can types.
+RedBull Tracker is a Windows taskbar widget that tracks Red Bull consumption. It displays cans visually in the taskbar, allowing quick add/remove with mouse clicks. Uses pure Win32 GDI rendering via the TaskbarWidget submodule. Supports offline mode with local persistence and configurable can types.
 
 ## Build Commands
 
@@ -26,8 +26,8 @@ dotnet publish src/RedBullTracker/RedBullTracker.csproj --configuration Release 
 
 ### Solution Structure
 
-- **RedBullTracker** (`src/RedBullTracker/`) - WinUI 3 app with taskbar widget
-- **TaskbarWidget** (`lib/taskbar-widget/`) - Git submodule for taskbar widget injection
+- **RedBullTracker** (`src/RedBullTracker/`) - Win32 GDI app with taskbar widget
+- **TaskbarWidget** (`lib/taskbar-widget/`) - Git submodule for immediate-mode GDI widget toolkit
 
 After cloning, initialize the submodule:
 ```bash
@@ -38,35 +38,33 @@ git submodule update --init --recursive
 
 ```
 src/RedBullTracker/
-├── Program.cs              # Entry point with ComWrappers init
-├── App.xaml.cs             # Creates widget, syncs startup settings
-├── MainWindow.xaml.cs      # Hidden window (WinUI lifecycle requirement)
+├── Program.cs              # Entry point, creates services, runs message loop
 ├── Widget/
-│   ├── RedBullWidget.cs           # Injection orchestrator
-│   └── RedBullWidgetContent.xaml  # Visual UI with can images
+│   └── RedBullWidget.cs    # Render callback with can images + click handlers
 ├── Services/
 │   ├── IRedBullService.cs         # Interface for count operations
-│   ├── OfflineRedBullService.cs   # Local counter with persistence
-│   ├── OnlineRedBullService.cs    # API mock (placeholder)
+│   ├── OfflineRedBullService.cs   # Local counter with file persistence
 │   ├── SettingsService.cs         # Config and count persistence
 │   └── StartupService.cs          # Windows startup registry
 └── Models/
-    ├── RedBull.cs                 # Count model
+    ├── RedBull.cs                 # RedBullCount record
     └── AppConfig.cs               # Configuration model
 ```
 
 ### Widget System
 
-The widget uses `TaskbarInjectionHelper` from the submodule:
-1. Creates a host window with `DeferInjection=true`
-2. Sets up `DesktopWindowXamlSource` for WinUI content
-3. Injects into taskbar after XAML setup
-4. Dynamically resizes based on can count
+RedBullWidget uses the `TaskbarWidget.Widget` API (immediate-mode Win32 GDI):
+1. Loads can images via `WidgetImage.FromFile()` from `Assets/` directory
+2. Creates `new Widget("RedBull", render: ctx => { ... })` with a render callback
+3. Render callback draws can images horizontally using `ctx.Panel()` and `h.DrawImage()`
+4. Left-click removes a can, right-click adds a can (via `p.OnClick()` / `p.OnRightClick()`)
+5. `widget.Invalidate()` re-renders when `IRedBullService.CountChanged` fires
+6. `Widget.RunMessageLoop()` runs the Win32 message loop
 
 ### Services
 
-- **OfflineRedBullService**: Manages count with file persistence
-- **SettingsService**: Loads/saves config.json and count.txt
+- **OfflineRedBullService**: Manages count with file persistence, fires `CountChanged` event
+- **SettingsService**: Loads/saves `config.json` and `count.txt`
 - **StartupService**: Manages Windows startup via registry
 
 ### Data Storage
@@ -88,9 +86,9 @@ All data stored in `%LOCALAPPDATA%\RedBullTracker\`:
 
 ## Gotchas
 
-- **Platform required**: WinUI 3 requires explicit platform. Use `-p:Platform=x64` for all commands.
-- **Hidden MainWindow**: Don't call `Activate()` on MainWindow - it must stay hidden for widget-only mode.
+- **Platform required**: Use `-p:Platform=x64` for all build commands.
 - **Submodule**: Must initialize submodule before building.
+- **Assets**: Can images must exist in `Assets/` directory (`redbull-default.png`, `redbull-sugarfree.png`, `redbull-empty.png`).
 
 ## Releases
 
