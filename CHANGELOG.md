@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v2.0.1] - 2026-02-12
+
+### Changed
+- Smooth lerp animation when dragging widgets to reorder
+- Smooth animation when widget resizes (neighboring widgets slide instead of snapping)
+
+### Fixed
+- Right-click no longer ignored on every other rapid click
+- Widget no longer jumps to wrong position when adding cans
+
 ## [v2.0.0] - 2026-02-12
 
 ### Changed
