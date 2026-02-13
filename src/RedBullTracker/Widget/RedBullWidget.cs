@@ -58,13 +58,13 @@ public class RedBullWidget : IDisposable
 
     private void LoadImages()
     {
-        var basePath = AppContext.BaseDirectory;
+        var asm = typeof(RedBullWidget).Assembly;
         var canFileName = _canType?.ToLowerInvariant() == "sugarfree"
             ? "redbull-sugarfree.png"
             : "redbull-default.png";
 
-        _canImage = WidgetImage.FromFile(Path.Combine(basePath, "Assets", canFileName));
-        _emptyImage = WidgetImage.FromFile(Path.Combine(basePath, "Assets", "redbull-empty.png"));
+        _canImage = WidgetImage.FromResource(asm, $"RedBullTracker.Assets.{canFileName}");
+        _emptyImage = WidgetImage.FromResource(asm, "RedBullTracker.Assets.redbull-empty.png");
     }
 
     private void OnCountChanged(object? sender, EventArgs e)
