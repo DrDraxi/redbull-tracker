@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v2.0.4] - 2026-02-16
+
+### Fixed
+- Widget now auto-positions correctly when running as the only widget
+- Periodic position drift detection keeps widget aligned with tray area
+- Widget repositions on display resolution and system settings changes
+- Rapid left-clicks no longer ignored on every other click
+
 ## [v2.0.3] - 2026-02-13
 
 ### Fixed
