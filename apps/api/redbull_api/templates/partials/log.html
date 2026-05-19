@@ -1,0 +1,12 @@
+<section id="log" hx-get="/ui/log" hx-trigger="every 10s" hx-swap="outerHTML">
+  <h2>Recent activity</h2>
+  {% if batches %}
+    <ul class="log">
+      {% for batch in batches %}
+        {% include "partials/batch_row.html" %}
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No activity yet.</p>
+  {% endif %}
+</section>

@@ -1,0 +1,19 @@
+* { box-sizing: border-box; }
+body { font: 14px/1.4 system-ui, sans-serif; margin: 0; padding: 1rem; max-width: 800px; margin-inline: auto; }
+header { display: flex; align-items: center; justify-content: space-between; }
+h1 { font-size: 1.4rem; margin: 0; }
+h2 { font-size: 1.1rem; margin-top: 1.5rem; }
+section { margin-block: 1.5rem; padding: 1rem; border: 1px solid #ddd; border-radius: 6px; }
+ul.by-type, ul.log { list-style: none; padding: 0; margin: 0; }
+ul.by-type li { display: inline-block; margin-right: 1rem; padding: 0.25rem 0.5rem; background: #f5f5f5; border-radius: 4px; }
+li.batch { padding: 0.5rem; border-bottom: 1px solid #eee; display: grid; grid-template-columns: 1fr auto; gap: 0.25rem 1rem; }
+li.batch--receipt { background: #fafffd; }
+.batch-meta { color: #666; font-size: 0.85rem; }
+.batch-items .item { margin-right: 0.5rem; }
+.batch-note { font-style: italic; color: #555; grid-column: 1; }
+li.batch button { background: transparent; border: none; cursor: pointer; color: #c33; font-size: 1.2rem; align-self: start; }
+form { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+input, button { padding: 0.4rem 0.6rem; font: inherit; }
+button { cursor: pointer; }
+.login { flex-direction: column; align-items: stretch; max-width: 300px; }
+.error { color: #c33; }

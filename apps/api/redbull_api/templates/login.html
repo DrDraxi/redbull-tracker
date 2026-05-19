@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Login — Red Bull Tracker{% endblock %}
+{% block content %}
+  <form method="post" action="{{ url_for('ui.login_submit') }}" class="login">
+    <label>Token <input type="password" name="token" autofocus required></label>
+    <button type="submit">Sign in</button>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  </form>
+{% endblock %}

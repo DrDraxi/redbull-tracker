@@ -1,0 +1,12 @@
+<section id="stock" hx-get="/ui/stock" hx-trigger="every 5s" hx-swap="outerHTML">
+  <h2>Stock: {{ stock.total }}</h2>
+  {% if stock.by_type %}
+    <ul class="by-type">
+      {% for type, count in stock.by_type.items() %}
+        <li><strong>{{ type }}</strong>: {{ count }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No Red Bulls in stock.</p>
+  {% endif %}
+</section>

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+  <section id="stock" hx-get="/ui/stock" hx-trigger="every 5s" hx-swap="outerHTML">
+    {% include "partials/stock.html" %}
+  </section>
+
+  <section class="actions">
+    <h2>Manual adjust</h2>
+    <form hx-post="/api/v1/adjust" hx-ext="json-enc" hx-target="#stock" hx-swap="none">
+      <input name="type" placeholder="type (e.g. default)" required>
+      <input name="delta" type="number" required>
+      <input name="note" placeholder="note (optional)">
+      <button>Apply</button>
+    </form>
+
+    <h2>Upload receipt</h2>
+    <form hx-post="/api/v1/receipts" hx-encoding="multipart/form-data" hx-target="#log" hx-swap="outerHTML">
+      <input type="file" name="image" accept="image/*" required>
+      <button>Parse with Claude</button>
+    </form>
+  </section>
+
+  <section id="log" hx-get="/ui/log" hx-trigger="every 10s" hx-swap="outerHTML">
+    {% include "partials/log.html" %}
+  </section>
+{% endblock %}

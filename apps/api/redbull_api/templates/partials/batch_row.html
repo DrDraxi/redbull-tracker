@@ -1,0 +1,19 @@
+<li class="batch batch--{{ batch.source }}" id="batch-{{ batch.id }}">
+  <div class="batch-meta">
+    <span class="time">{{ batch.created_at }}</span>
+    <span class="source">{{ batch.source }}</span>
+    {% if batch.receipt %}<a href="/api/v1/receipts/{{ batch.receipt.id }}/thumb">thumb</a>{% endif %}
+  </div>
+  <div class="batch-items">
+    {% if batch.items %}
+      {% for it in batch.items %}
+        <span class="item">{{ it.delta }} {{ it.type }}</span>
+      {% endfor %}
+    {% else %}
+      <em>(no items)</em>
+    {% endif %}
+  </div>
+  {% if batch.note %}<div class="batch-note">{{ batch.note }}</div>{% endif %}
+  <button hx-delete="/api/v1/batches/{{ batch.id }}" hx-target="#log" hx-swap="outerHTML"
+          hx-confirm="Delete this entry?">×</button>
+</li>
