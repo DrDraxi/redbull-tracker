@@ -9,6 +9,7 @@ from flask import Flask, g, jsonify, request
 from .auth import COOKIE_MAX_AGE, COOKIE_NAME, check_bearer, check_cookie
 from .config import Config
 from .db import connect, init_db
+from .routes.api import bp as api_bp
 from .stock import get_stock
 
 
@@ -62,5 +63,7 @@ def create_app(config: Config | None = None) -> Flask:
     @app.get("/api/v1/stock")
     def stock():
         return jsonify(get_stock(g.db))
+
+    app.register_blueprint(api_bp)
 
     return app
