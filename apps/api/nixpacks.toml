@@ -1,0 +1,12 @@
+[phases.setup]
+nixPkgs = ["curl", "gcc", "cacert"]
+
+[phases.install]
+cmds = [
+  "curl -LsSf https://astral.sh/uv/install.sh | sh",
+  "$HOME/.local/bin/uv python install 3.12",
+  "$HOME/.local/bin/uv sync --frozen"
+]
+
+[start]
+cmd = "$HOME/.local/bin/uv run gunicorn --bind 0.0.0.0:$PORT --workers 2 --access-logfile - 'redbull_api.app:create_app()'"
