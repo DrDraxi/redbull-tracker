@@ -13,10 +13,15 @@ bp = Blueprint("api", __name__, url_prefix="/api/v1")
 
 @bp.post("/adjust")
 def adjust():
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True) or request.form or {}
     type_ = data.get("type")
-    delta = data.get("delta")
-    note = data.get("note")
+    raw_delta = data.get("delta")
+    # delta arrives as int via JSON or str via form-encoded — normalize
+    try:
+        delta = int(raw_delta) if raw_delta is not None and raw_delta != "" else None
+    except (TypeError, ValueError):
+        delta = None
+    note = data.get("note") or None
     if not isinstance(type_, str) or not type_:
         return jsonify({"error": "invalid_type"}), 400
     if not isinstance(delta, int) or delta == 0:

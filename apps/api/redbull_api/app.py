@@ -10,6 +10,7 @@ from .auth import COOKIE_MAX_AGE, COOKIE_NAME, check_bearer, check_cookie
 from .config import Config
 from .db import connect, init_db
 from .routes.api import bp as api_bp
+from .routes.ui import bp as ui_bp
 from .stock import get_stock
 
 
@@ -65,5 +66,6 @@ def create_app(config: Config | None = None) -> Flask:
         return jsonify(get_stock(g.db))
 
     app.register_blueprint(api_bp)
+    app.register_blueprint(ui_bp)
 
     return app

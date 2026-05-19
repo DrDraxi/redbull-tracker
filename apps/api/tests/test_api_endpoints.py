@@ -86,3 +86,13 @@ def test_delete_batch_reverses_stock(client):
 def test_delete_nonexistent_batch_404(client):
     r = client.delete("/api/v1/batches/9999", headers=HEADERS)
     assert r.status_code == 404
+
+
+def test_adjust_accepts_form_encoded(client):
+    r = client.post(
+        "/api/v1/adjust",
+        data={"type": "default", "delta": "2", "note": "from form"},
+        headers=HEADERS,
+    )
+    assert r.status_code == 200
+    assert r.json["stock"]["by_type"] == {"default": 2}

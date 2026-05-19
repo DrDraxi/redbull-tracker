@@ -6,7 +6,7 @@
 
   <section class="actions">
     <h2>Manual adjust</h2>
-    <form hx-post="/api/v1/adjust" hx-ext="json-enc" hx-target="#stock" hx-swap="none">
+    <form hx-post="/api/v1/adjust" hx-target="#stock" hx-swap="none">
       <input name="type" placeholder="type (e.g. default)" required>
       <input name="delta" type="number" required>
       <input name="note" placeholder="note (optional)">
