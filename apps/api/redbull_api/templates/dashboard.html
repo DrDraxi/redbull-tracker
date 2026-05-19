@@ -5,21 +5,12 @@
   </section>
 
   <section class="actions-grid">
-    <form class="action-card action-card--primary"
-          hx-post="/api/v1/receipts"
-          hx-encoding="multipart/form-data"
-          hx-target="#log"
-          hx-swap="outerHTML"
-          hx-on::before-request="this.classList.add('is-loading')"
-          hx-on::after-request="this.classList.remove('is-loading'); this.reset()">
-      <label class="upload-label">
-        <input type="file" name="image" accept="image/*" capture="environment" required>
-        <span class="upload-icon" aria-hidden="true">📷</span>
-        <span class="upload-title">SCAN RECEIPT</span>
-        <span class="upload-hint">Snap a photo or pick a file — Claude reads it</span>
-      </label>
+    <button class="action-card action-card--primary" type="button" id="scan-btn">
+      <span class="upload-icon" aria-hidden="true">📷</span>
+      <span class="upload-title">SCAN RECEIPT</span>
+      <span class="upload-hint">Tap to open camera and snap your receipt</span>
       <div class="spinner" aria-hidden="true"></div>
-    </form>
+    </button>
 
     <details class="action-card action-card--secondary">
       <summary>
@@ -27,14 +18,34 @@
         <span class="upload-title">MANUAL ADJUST</span>
         <span class="upload-hint">Add or remove cans by hand</span>
       </summary>
-      <form class="form-stack form-stack--inset"
+      <form id="adjust-form"
+            class="form-stack form-stack--inset"
             hx-post="/api/v1/adjust"
             hx-target="#stock-card"
             hx-swap="outerHTML"
-            hx-on::after-request="this.reset()">
+            hx-on::after-request="this.reset(); document.getElementById('type-other').hidden = true;">
         <label class="field">
           <span>Type</span>
-          <input name="type" placeholder="default, sugarfree, …" value="default" required>
+          <select name="type" id="type-select" required>
+            <optgroup label="Core">
+              <option value="default">Red Bull Energy (original)</option>
+              <option value="sugarfree" selected>Sugarfree</option>
+              <option value="zero">Zero</option>
+            </optgroup>
+            <optgroup label="Editions">
+              <option value="tropical">Tropical (yellow)</option>
+              <option value="watermelon">Watermelon (red)</option>
+              <option value="coconut">Coconut Berry (white)</option>
+              <option value="peach">Peach (peach)</option>
+              <option value="summer">Summer Edition</option>
+              <option value="winter">Winter Edition</option>
+            </optgroup>
+            <option value="__other__">Other…</option>
+          </select>
+        </label>
+        <label class="field" id="type-other" hidden>
+          <span>Custom type</span>
+          <input name="type_custom" placeholder="lowercase keyword, e.g. apricot">
         </label>
         <label class="field">
           <span>Delta</span>
@@ -52,4 +63,217 @@
   <section id="log" class="log-section">
     {% include "partials/log.html" %}
   </section>
+
+  <!-- Camera modal ------------------------------------------------------- -->
+  <div class="cam-modal" id="cam-modal" hidden>
+    <div class="cam-modal__inner">
+      <header class="cam-modal__top">
+        <span class="cam-title">SCAN RECEIPT</span>
+        <button class="btn btn-ghost" type="button" id="cam-close" aria-label="Close">✕</button>
+      </header>
+
+      <div class="cam-stage" id="cam-stage">
+        <video id="cam-video" autoplay playsinline muted></video>
+        <canvas id="cam-canvas" hidden></canvas>
+        <img id="cam-preview" alt="" hidden>
+        <div class="cam-error" id="cam-error" hidden></div>
+      </div>
+
+      <footer class="cam-modal__bottom">
+        <div id="cam-state-live" class="cam-actions">
+          <button class="btn btn-ghost" type="button" id="cam-flip" aria-label="Flip camera">🔄</button>
+          <button class="cam-shutter" type="button" id="cam-shoot" aria-label="Capture"></button>
+          <span class="cam-spacer"></span>
+        </div>
+        <div id="cam-state-preview" class="cam-actions" hidden>
+          <button class="btn btn-ghost" type="button" id="cam-retake">Retake</button>
+          <button class="btn btn-primary" type="button" id="cam-use">Use this →</button>
+        </div>
+        <div id="cam-state-uploading" class="cam-actions" hidden>
+          <div class="spinner on" aria-hidden="true"></div>
+          <span class="cam-uploading-text">Sending to Claude…</span>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+  // ===== Manual-adjust dropdown: reveal custom input when "Other…" picked =====
+  (function() {
+    const select = document.getElementById('type-select');
+    const other = document.getElementById('type-other');
+    const otherInput = other.querySelector('input');
+    const form = document.getElementById('adjust-form');
+    if (!select) return;
+
+    select.addEventListener('change', () => {
+      const isOther = select.value === '__other__';
+      other.hidden = !isOther;
+      if (isOther) otherInput.focus();
+    });
+
+    // On submit, swap the select value with the custom one if "Other…" picked
+    form.addEventListener('submit', (e) => {
+      if (select.value === '__other__') {
+        const custom = (otherInput.value || '').trim().toLowerCase();
+        if (!custom) {
+          e.preventDefault();
+          otherInput.focus();
+          return;
+        }
+        // Hijack: temporarily change the select option so HTMX sends the custom value
+        const opt = select.querySelector('option[value="__other__"]');
+        opt.value = custom;
+        // Restore after submit so future "Other…" still works
+        setTimeout(() => { opt.value = '__other__'; }, 0);
+      }
+    }, true);
+  })();
+
+  // ===== Camera capture =====
+  (function() {
+    const btn = document.getElementById('scan-btn');
+    const modal = document.getElementById('cam-modal');
+    const video = document.getElementById('cam-video');
+    const canvas = document.getElementById('cam-canvas');
+    const preview = document.getElementById('cam-preview');
+    const errBox = document.getElementById('cam-error');
+    const closeBtn = document.getElementById('cam-close');
+    const shoot = document.getElementById('cam-shoot');
+    const retake = document.getElementById('cam-retake');
+    const useIt = document.getElementById('cam-use');
+    const flip = document.getElementById('cam-flip');
+
+    const stateLive = document.getElementById('cam-state-live');
+    const statePreview = document.getElementById('cam-state-preview');
+    const stateUploading = document.getElementById('cam-state-uploading');
+
+    let stream = null;
+    let facingMode = 'environment';  // start with rear camera on mobile
+    let capturedBlob = null;
+
+    async function openCamera() {
+      errBox.hidden = true;
+      preview.hidden = true;
+      video.hidden = false;
+      setState('live');
+      modal.hidden = false;
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: facingMode }, width: { ideal: 1920 } },
+          audio: false,
+        });
+        video.srcObject = stream;
+      } catch (err) {
+        showError(formatErr(err));
+      }
+    }
+
+    function formatErr(err) {
+      if (!err) return 'Camera failed.';
+      if (err.name === 'NotAllowedError') return 'Camera permission denied. Enable it in your browser settings and try again.';
+      if (err.name === 'NotFoundError') return 'No camera found on this device.';
+      if (err.name === 'NotReadableError') return 'Camera is in use by another app.';
+      return `Camera error: ${err.message || err.name || err}`;
+    }
+
+    function showError(msg) {
+      errBox.textContent = msg;
+      errBox.hidden = false;
+      video.hidden = true;
+    }
+
+    function stopCamera() {
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+        stream = null;
+      }
+      video.srcObject = null;
+    }
+
+    function closeModal() {
+      stopCamera();
+      modal.hidden = true;
+      capturedBlob = null;
+      preview.src = '';
+    }
+
+    function setState(s) {
+      stateLive.hidden = s !== 'live';
+      statePreview.hidden = s !== 'preview';
+      stateUploading.hidden = s !== 'uploading';
+    }
+
+    function capture() {
+      if (!video.videoWidth) return;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+      canvas.toBlob((blob) => {
+        capturedBlob = blob;
+        preview.src = URL.createObjectURL(blob);
+        preview.hidden = false;
+        video.hidden = true;
+        setState('preview');
+        stopCamera();  // free the camera while previewing
+      }, 'image/jpeg', 0.92);
+    }
+
+    async function flipCamera() {
+      facingMode = facingMode === 'environment' ? 'user' : 'environment';
+      stopCamera();
+      await openCamera();
+    }
+
+    async function upload() {
+      if (!capturedBlob) return;
+      setState('uploading');
+      const fd = new FormData();
+      fd.append('image', capturedBlob, 'receipt.jpg');
+      try {
+        const resp = await fetch('/api/v1/receipts', { method: 'POST', body: fd, credentials: 'same-origin' });
+        // Refresh the log section regardless of 200/422 (both produce a batch)
+        const logResp = await fetch('/ui/log', { credentials: 'same-origin' });
+        if (logResp.ok) {
+          const html = await logResp.text();
+          const wrap = document.createElement('div');
+          wrap.innerHTML = html;
+          const fresh = wrap.firstElementChild;
+          if (fresh) document.getElementById('log').replaceWith(fresh);
+        }
+        // Also refresh stock
+        const stockResp = await fetch('/ui/stock', { credentials: 'same-origin' });
+        if (stockResp.ok) {
+          const html = await stockResp.text();
+          const wrap = document.createElement('div');
+          wrap.innerHTML = html;
+          const fresh = wrap.firstElementChild;
+          if (fresh) document.getElementById('stock-card').replaceWith(fresh);
+        }
+        if (!resp.ok && resp.status !== 422) {
+          const text = await resp.text();
+          alert(`Upload failed (${resp.status}): ${text.slice(0, 200)}`);
+        }
+      } catch (err) {
+        alert(`Upload failed: ${err.message || err}`);
+      } finally {
+        closeModal();
+      }
+    }
+
+    btn.addEventListener('click', openCamera);
+    closeBtn.addEventListener('click', closeModal);
+    shoot.addEventListener('click', capture);
+    retake.addEventListener('click', () => { capturedBlob = null; openCamera(); });
+    useIt.addEventListener('click', upload);
+    flip.addEventListener('click', flipCamera);
+
+    // ESC to close
+    document.addEventListener('keydown', (e) => {
+      if (!modal.hidden && e.key === 'Escape') closeModal();
+    });
+  })();
+  </script>
 {% endblock %}
