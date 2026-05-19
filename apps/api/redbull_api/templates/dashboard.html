@@ -29,9 +29,8 @@
       <form id="adjust-form"
             class="form-stack form-stack--inset"
             hx-post="/api/v1/adjust"
-            hx-target="#stock-card"
-            hx-swap="outerHTML"
-            hx-on::after-request="this.reset(); document.getElementById('type-other').hidden = true;">
+            hx-swap="none"
+            hx-on::after-request="this.reset(); document.getElementById('type-other').hidden = true; htmx.ajax('GET', '/ui/stock', {target: '#stock-card', swap: 'outerHTML'}); htmx.ajax('GET', '/ui/log', {target: '#log', swap: 'outerHTML'});">
         <label class="field">
           <span>Type</span>
           <select name="type" id="type-select" required>

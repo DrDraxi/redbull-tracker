@@ -29,8 +29,8 @@
   </div>
   <button class="log-delete"
           hx-delete="/api/v1/batches/{{ batch.id }}"
-          hx-target="#log"
-          hx-swap="outerHTML"
+          hx-swap="none"
+          hx-on::after-request="htmx.ajax('GET', '/ui/stock', {target: '#stock-card', swap: 'outerHTML'}); htmx.ajax('GET', '/ui/log', {target: '#log', swap: 'outerHTML'});"
           hx-confirm="Delete this entry? Stock will be reversed."
           aria-label="Delete">✕</button>
 </li>
