@@ -352,6 +352,102 @@ main {
   font-style: italic;
 }
 
+/* Tesco price cards (shown when stock is empty) ------------------------- */
+
+.price-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+  margin-top: 0.75rem;
+}
+
+.price-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding: 0.9rem 1rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--text);
+  transition: border-color 120ms ease, transform 120ms ease, background 120ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.price-card:hover {
+  border-color: var(--rb-yellow);
+  background: rgba(255, 209, 44, 0.06);
+  transform: translateY(-1px);
+}
+
+.price-card--default { border-left: 3px solid var(--rb-red); }
+.price-card--sugarfree { border-left: 3px solid #2563EB; }
+
+.price-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.price-normal {
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.price-clubcard {
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  color: var(--rb-yellow);
+}
+
+.price-strike {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.price-badge {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.6rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: var(--rb-yellow);
+  color: #0a0a0a;
+}
+
+.price-unknown {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.btn-sm {
+  padding: 0.45rem 0.85rem;
+  font-size: 0.75rem;
+}
+
+.price-refresh {
+  align-self: center;
+  margin-top: 0.5rem;
+}
+
+.price-refresh.is-loading {
+  opacity: 0.6;
+  cursor: progress;
+}
+
 /* Actions grid ------------------------------------------------------------- */
 
 .actions-grid {

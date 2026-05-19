@@ -22,6 +22,7 @@ from ..auth import (
     make_cookie_value,
 )
 from ..config import Config
+from ..prices import list_prices
 from ..stock import get_stock, list_batches
 
 bp = Blueprint("ui", __name__)
@@ -70,9 +71,11 @@ def logout():
 def dashboard():
     if not _is_authed():
         return redirect(url_for("ui.login_form"))
+    stock = get_stock(g.db)
     return render_template(
         "dashboard.html",
-        stock=get_stock(g.db),
+        stock=stock,
+        prices=list_prices(g.db) if stock["total"] == 0 else [],
         batches=list_batches(g.db, limit=50),
         session_authed=True,
     )
@@ -82,7 +85,12 @@ def dashboard():
 def stock_fragment():
     if not _is_authed():
         return "", 401
-    return render_template("partials/stock.html", stock=get_stock(g.db))
+    stock = get_stock(g.db)
+    return render_template(
+        "partials/stock.html",
+        stock=stock,
+        prices=list_prices(g.db) if stock["total"] == 0 else [],
+    )
 
 
 @bp.get("/ui/log")

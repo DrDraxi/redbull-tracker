@@ -35,3 +35,20 @@ CREATE TABLE IF NOT EXISTS receipts (
 
 CREATE INDEX IF NOT EXISTS idx_batches_created_at ON batches(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_batch_items_batch  ON batch_items(batch_id);
+
+-- Per-type Tesco price cache. Refreshed on demand via Claude's web_fetch tool.
+-- Cents (Czech haléř) to avoid float weirdness; null = not yet fetched.
+CREATE TABLE IF NOT EXISTS prices (
+    type                  TEXT PRIMARY KEY,
+    label                 TEXT NOT NULL,
+    url                   TEXT NOT NULL,
+    price_normal_cents    INTEGER,
+    price_clubcard_cents  INTEGER,
+    currency              TEXT NOT NULL DEFAULT 'Kč',
+    updated_at            TEXT
+);
+
+INSERT INTO prices (type, label, url) VALUES
+  ('default',   'Red Bull Energy 250ml',    'https://nakup.itesco.cz/shop/cs-CZ/products/205112246'),
+  ('sugarfree', 'Red Bull Sugarfree 250ml', 'https://nakup.itesco.cz/shop/cs-CZ/products/213144192')
+ON CONFLICT(type) DO NOTHING;

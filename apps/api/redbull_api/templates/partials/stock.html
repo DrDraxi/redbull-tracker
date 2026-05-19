@@ -12,7 +12,35 @@
         {% endfor %}
       </ul>
     {% else %}
-      <p class="stock-empty">No Red Bulls. Get to it.</p>
+      <p class="stock-empty">No Red Bulls. Get one.</p>
+      {% if prices %}
+        <div class="price-grid">
+          {% for p in prices %}
+            <a class="price-card price-card--{{ p.type }}" href="{{ p.url }}" target="_blank" rel="noopener">
+              <span class="price-label">{{ p.label }}</span>
+              {% if p.price_normal is not none %}
+                {% if p.price_clubcard is not none and p.price_clubcard < p.price_normal %}
+                  <span class="price-clubcard">{{ "%.2f"|format(p.price_clubcard) }} {{ p.currency }}</span>
+                  <span class="price-strike">{{ "%.2f"|format(p.price_normal) }} {{ p.currency }}</span>
+                  <span class="price-badge">Clubcard</span>
+                {% else %}
+                  <span class="price-normal">{{ "%.2f"|format(p.price_normal) }} {{ p.currency }}</span>
+                {% endif %}
+              {% else %}
+                <span class="price-unknown">— tap refresh —</span>
+              {% endif %}
+            </a>
+          {% endfor %}
+        </div>
+        <button class="btn btn-ghost btn-sm price-refresh"
+                type="button"
+                hx-post="/api/v1/prices/refresh"
+                hx-swap="none"
+                hx-on::before-request="this.classList.add('is-loading'); this.disabled = true"
+                hx-on::after-request="this.classList.remove('is-loading'); this.disabled = false; htmx.ajax('GET', '/ui/stock', {target: '#stock-card', swap: 'outerHTML'});">
+          ↻ Refresh from Tesco
+        </button>
+      {% endif %}
     {% endif %}
   </article>
 </section>

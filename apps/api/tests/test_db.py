@@ -12,7 +12,7 @@ def test_init_db_creates_tables(tmp_path: Path):
             "SELECT name FROM sqlite_master "
             "WHERE type='table' AND name NOT LIKE 'sqlite_%'"
         )}
-    assert tables == {"stock", "batches", "batch_items", "receipts"}
+    assert tables == {"stock", "batches", "batch_items", "receipts", "prices"}
 
 
 def test_init_db_is_idempotent(tmp_path: Path):

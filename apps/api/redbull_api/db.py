@@ -21,7 +21,7 @@ def connect(db_path: Path) -> sqlite3.Connection:
 def init_db(db_path: Path) -> None:
     """Create the schema if not present. Idempotent."""
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    schema = files("redbull_api").joinpath("schema.sql").read_text()
+    schema = files("redbull_api").joinpath("schema.sql").read_text(encoding="utf-8")
     with connect(db_path) as conn:
         conn.executescript(schema)
 

@@ -10,6 +10,7 @@ import anthropic
 from flask import Blueprint, current_app, g, jsonify, request, send_from_directory
 
 from ..images import save_image_and_thumbnail
+from ..prices import list_prices, refresh_from_tesco
 from ..receipts import parse_receipt
 from ..stock import add_batch, delete_batch, get_stock, list_batches
 
@@ -126,6 +127,27 @@ def receipt_image(receipt_id: int):
         return jsonify({"error": "not_found"}), 404
     cfg = current_app.config["CONFIG"]
     return send_from_directory(cfg.data_dir / "receipts", row["filename"])
+
+
+@bp.get("/prices")
+def get_prices():
+    return jsonify({"prices": list_prices(g.db)})
+
+
+@bp.post("/prices/refresh")
+def refresh_prices():
+    cfg = current_app.config["CONFIG"]
+    if not cfg.anthropic_api_key:
+        return jsonify({"error": "anthropic_key_missing"}), 503
+    client = anthropic.Anthropic(api_key=cfg.anthropic_api_key)
+    try:
+        fetched = refresh_from_tesco(client, g.db)
+    except anthropic.APIError as e:
+        return jsonify({"error": "anthropic_error", "detail": str(e)[:300]}), 502
+    return jsonify({
+        "fetched": len(fetched),
+        "prices": list_prices(g.db),
+    })
 
 
 @bp.get("/receipts/<int:receipt_id>/thumb")
