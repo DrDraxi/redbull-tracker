@@ -91,8 +91,10 @@ def _call_claude(
             }
         ],
         tools=[RECORD_TOOL],
+        # Forced tool use rules out adaptive thinking — Anthropic API rejects
+        # the combination. The strict tool schema already guarantees structured
+        # output, so thinking isn't needed here.
         tool_choice={"type": "tool", "name": "record_redbulls"},
-        thinking={"type": "adaptive"},
         messages=[
             {
                 "role": "user",
