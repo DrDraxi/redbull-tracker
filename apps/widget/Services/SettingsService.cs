@@ -9,7 +9,9 @@ public class SettingsService
     private readonly string _countFilePath;
     private readonly string _configFilePath;
 
-    public AppConfig Config { get; private set; } = new();
+    /// <summary>Loaded config. Setter is public so tests can swap a known
+    /// AppConfig in without relying on whatever lives in %LOCALAPPDATA%.</summary>
+    public AppConfig Config { get; set; } = new();
 
     public SettingsService()
     {

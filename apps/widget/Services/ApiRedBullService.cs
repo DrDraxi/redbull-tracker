@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using RedBullTracker.Models;
 
@@ -95,8 +96,54 @@ public class ApiRedBullService : IRedBullService, IDisposable
         return true;
     }
 
-    public Task AddCanAsync() => throw new InvalidOperationException("Widget is in read-only API mode");
-    public Task RemoveCanAsync() => throw new InvalidOperationException("Widget is in read-only API mode");
+    public Task AddCanAsync() =>
+        throw new InvalidOperationException("Adding via widget is disabled in API mode");
+
+    public async Task RemoveCanAsync(string? type = null)
+    {
+        if (string.IsNullOrEmpty(type))
+            throw new InvalidOperationException("type is required when removing in API mode");
+
+        var payload = JsonSerializer.Serialize(
+            new AdjustRequest { Type = type, Delta = -1 },
+            AppJsonContext.Default.AdjustRequest);
+
+        using var req = new HttpRequestMessage(HttpMethod.Post, "/api/v1/adjust")
+        {
+            Content = new StringContent(payload, Encoding.UTF8, "application/json"),
+        };
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+
+        try
+        {
+            using var resp = await _http.SendAsync(req).ConfigureAwait(false);
+            // Whether the server accepted, refused (underflow → 400), or errored,
+            // the next refresh reconciles the truth. Optimistically update locally
+            // on 2xx for snappier UI; otherwise just kick a refresh.
+            if (resp.IsSuccessStatusCode)
+            {
+                ApplyLocalRemoval(type);
+            }
+            await RefreshAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            // Network blip — flag stale; the timer will retry the GET soon.
+            MarkStale();
+        }
+    }
+
+    private void ApplyLocalRemoval(string type)
+    {
+        if (_byType.TryGetValue(type, out var n) && n > 0)
+        {
+            var next = new Dictionary<string, int>(_byType);
+            if (n - 1 <= 0) next.Remove(type); else next[type] = n - 1;
+            _byType = next;
+            _count = Math.Max(0, _count - 1);
+            CountChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
 
     public void Dispose()
     {

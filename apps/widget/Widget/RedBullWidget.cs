@@ -43,19 +43,28 @@ public class RedBullWidget : IDisposable
                     }
                     else
                     {
-                        // Stable ordering across renders
+                        // Stable ordering across renders. Each can lives in its own
+                        // panel so left-click can drink THIS specific can (typed).
                         foreach (var (type, count) in byType.OrderBy(kv => kv.Key))
                         {
                             var icon = GetIcon(type);
+                            var canType = type;  // capture for the closure
                             for (int i = 0; i < count; i++)
-                                h.DrawImage(icon, widthDip: CanWidthDip, heightDip: CanHeightDip);
+                            {
+                                h.Panel(CanWidthDip, CanHeightDip, can =>
+                                {
+                                    can.DrawImage(icon, CanWidthDip, CanHeightDip);
+                                    can.OnClick(() => _ = _service.RemoveCanAsync(canType));
+                                    can.Tooltip($"Drink one {canType}");
+                                });
+                            }
                         }
                     }
                 });
 
+                // Right-click on the whole widget adds — offline mode only.
                 if (!_service.IsReadOnly)
                 {
-                    p.OnClick(() => _ = _service.RemoveCanAsync());
                     p.OnRightClick(() => _ = _service.AddCanAsync());
                 }
 
@@ -74,9 +83,10 @@ public class RedBullWidget : IDisposable
             if (total == 0)
                 return $"Red Bulls: 0\nSynced from API{staleNote}";
             var breakdown = string.Join(", ", byType.OrderBy(kv => kv.Key).Select(kv => $"{kv.Value} {kv.Key}"));
-            return $"Red Bulls: {breakdown} ({total} total)\nSynced from API{staleNote}";
+            return $"Red Bulls: {breakdown} ({total} total)\n"
+                 + $"Click a can to drink it{staleNote}";
         }
-        return $"Red Bulls: {total}\nLeft-click: Remove | Right-click: Add";
+        return $"Red Bulls: {total}\nLeft-click a can: Drink | Right-click: Add";
     }
 
     private WidgetImage GetIcon(string type)

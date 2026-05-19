@@ -35,8 +35,9 @@ public class OfflineRedBullService : IRedBullService
         return Task.CompletedTask;
     }
 
-    public Task RemoveCanAsync()
+    public Task RemoveCanAsync(string? type = null)
     {
+        // Offline tracks a single type; ignore the type parameter.
         if (_count > 0)
         {
             _count--;
