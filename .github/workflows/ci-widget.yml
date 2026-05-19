@@ -2,8 +2,18 @@ name: CI
 
 on:
   push:
-    branches: ["*"]
+    branches: [main]
+    paths:
+      - 'apps/widget/**'
+      - 'lib/taskbar-widget/**'
+      - 'RedBullTracker.sln'
+      - '.github/workflows/ci-widget.yml'
   pull_request:
+    paths:
+      - 'apps/widget/**'
+      - 'lib/taskbar-widget/**'
+      - 'RedBullTracker.sln'
+      - '.github/workflows/ci-widget.yml'
 
 jobs:
   build:
@@ -43,7 +53,7 @@ jobs:
 
       - name: Publish Single File (Release x64)
         run: |
-          dotnet publish src/RedBullTracker/RedBullTracker.csproj `
+          dotnet publish apps/widget/RedBullTracker.csproj `
             --configuration Release `
             --runtime ${{ env.RID }} `
             --self-contained true `

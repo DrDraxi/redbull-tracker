@@ -68,7 +68,7 @@ jobs:
       # 1. Build portable single-file exe
       - name: Publish Single File exe
         run: |
-          dotnet publish src/RedBullTracker/RedBullTracker.csproj `
+          dotnet publish apps/widget/RedBullTracker.csproj `
             --configuration Release `
             --runtime ${{ env.RID }} `
             --self-contained true `
@@ -92,7 +92,7 @@ jobs:
       # 2. Build portable zip (all files)
       - name: Publish for Zip
         run: |
-          dotnet publish src/RedBullTracker/RedBullTracker.csproj `
+          dotnet publish apps/widget/RedBullTracker.csproj `
             --configuration Release `
             --runtime ${{ env.RID }} `
             --self-contained true `

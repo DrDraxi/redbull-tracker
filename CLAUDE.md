@@ -16,17 +16,18 @@ dotnet build -p:Platform=x64
 dotnet build --configuration Release -p:Platform=x64
 
 # Run the app (x64)
-dotnet run --project src/RedBullTracker/RedBullTracker.csproj -p:Platform=x64
+dotnet run --project apps/widget/RedBullTracker.csproj -p:Platform=x64
 
 # Publish single-file exe (x64)
-dotnet publish src/RedBullTracker/RedBullTracker.csproj --configuration Release --runtime win-x64 --self-contained true -p:Platform=x64 -p:PublishSingleFile=true -p:WindowsPackageType=None -o publish
+dotnet publish apps/widget/RedBullTracker.csproj --configuration Release --runtime win-x64 --self-contained true -p:Platform=x64 -p:PublishSingleFile=true -p:WindowsPackageType=None -o publish
 ```
 
 ## Architecture
 
 ### Solution Structure
 
-- **RedBullTracker** (`src/RedBullTracker/`) - Win32 GDI app with taskbar widget
+- **RedBullTracker** (`apps/widget/`) - Win32 GDI app with taskbar widget
+- **API** (`apps/api/`) - Flask + SQLite backend (planned; see docs/superpowers/specs/2026-05-18-api-monorepo-receipt-tracking-design.md)
 - **TaskbarWidget** (`lib/taskbar-widget/`) - Git submodule for immediate-mode GDI widget toolkit
 
 After cloning, initialize the submodule:
@@ -37,7 +38,7 @@ git submodule update --init --recursive
 ### Key Components
 
 ```
-src/RedBullTracker/
+apps/widget/
 ├── Program.cs              # Entry point, creates services, runs message loop
 ├── Widget/
 │   └── RedBullWidget.cs    # Render callback with can images + click handlers
@@ -149,7 +150,7 @@ Follow [Semantic Versioning](https://semver.org/):
 
 ### Workflows
 
-- **CI** (`.github/workflows/ci.yml`): Runs on all pushes and PRs
+- **CI** (`.github/workflows/ci-widget.yml`): Runs on widget-related changes (pushes to main, all PRs)
   - Builds debug and release
   - Uploads portable exe artifact
 
