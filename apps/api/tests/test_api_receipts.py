@@ -87,3 +87,38 @@ def test_upload_rejects_non_image(client):
 def test_upload_rejects_missing_file(client):
     r = client.post("/api/v1/receipts", data={}, headers=HEADERS)
     assert r.status_code == 400
+
+
+def test_serve_thumbnail(client):
+    with patch("redbull_api.routes.api.parse_receipt") as mock_parse:
+        mock_parse.return_value = _fake_parse([{"type": "default", "count": 1}], "high")
+        upload = client.post(
+            "/api/v1/receipts",
+            data={"image": (io.BytesIO(_make_jpeg()), "r.jpg")},
+            content_type="multipart/form-data",
+            headers=HEADERS,
+        )
+    rid = upload.json["receipt_id"]
+    r = client.get(f"/api/v1/receipts/{rid}/thumb", headers=HEADERS)
+    assert r.status_code == 200
+    assert r.mimetype == "image/jpeg"
+
+
+def test_serve_full_image(client):
+    with patch("redbull_api.routes.api.parse_receipt") as mock_parse:
+        mock_parse.return_value = _fake_parse([{"type": "default", "count": 1}], "high")
+        upload = client.post(
+            "/api/v1/receipts",
+            data={"image": (io.BytesIO(_make_jpeg()), "r.jpg")},
+            content_type="multipart/form-data",
+            headers=HEADERS,
+        )
+    rid = upload.json["receipt_id"]
+    r = client.get(f"/api/v1/receipts/{rid}/image", headers=HEADERS)
+    assert r.status_code == 200
+    assert r.mimetype.startswith("image/")
+
+
+def test_serve_thumbnail_404(client):
+    r = client.get("/api/v1/receipts/9999/thumb", headers=HEADERS)
+    assert r.status_code == 404

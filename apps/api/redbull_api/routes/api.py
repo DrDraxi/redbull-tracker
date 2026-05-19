@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 import anthropic
-from flask import Blueprint, current_app, g, jsonify, request
+from flask import Blueprint, current_app, g, jsonify, request, send_from_directory
 
 from ..images import save_image_and_thumbnail
 from ..receipts import parse_receipt
@@ -115,3 +115,25 @@ def upload_receipt():
         payload["error"] = "no_redbulls_found"
         return jsonify(payload), 422
     return jsonify(payload)
+
+
+@bp.get("/receipts/<int:receipt_id>/image")
+def receipt_image(receipt_id: int):
+    row = g.db.execute(
+        "SELECT filename FROM receipts WHERE id = ?", (receipt_id,)
+    ).fetchone()
+    if not row:
+        return jsonify({"error": "not_found"}), 404
+    cfg = current_app.config["CONFIG"]
+    return send_from_directory(cfg.data_dir / "receipts", row["filename"])
+
+
+@bp.get("/receipts/<int:receipt_id>/thumb")
+def receipt_thumb(receipt_id: int):
+    row = g.db.execute(
+        "SELECT thumbnail FROM receipts WHERE id = ?", (receipt_id,)
+    ).fetchone()
+    if not row or not row["thumbnail"]:
+        return jsonify({"error": "not_found"}), 404
+    cfg = current_app.config["CONFIG"]
+    return send_from_directory(cfg.data_dir / "receipts" / "thumbs", row["thumbnail"])
