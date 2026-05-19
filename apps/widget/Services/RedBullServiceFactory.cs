@@ -6,15 +6,20 @@ public static class RedBullServiceFactory
 {
     public static IRedBullService Create(SettingsService settings)
     {
-        var apiUrl = Environment.GetEnvironmentVariable("REDBULL_API_URL");
-        var apiToken = Environment.GetEnvironmentVariable("REDBULL_API_TOKEN");
+        // Env vars override config.json so dev can swap targets without editing the file.
+        var apiUrl = FirstNonEmpty(
+            Environment.GetEnvironmentVariable("REDBULL_API_URL"),
+            settings.Config.ApiUrl);
+        var apiToken = FirstNonEmpty(
+            Environment.GetEnvironmentVariable("REDBULL_API_TOKEN"),
+            settings.Config.ApiToken);
 
         if (string.IsNullOrEmpty(apiUrl))
             return new OfflineRedBullService(settings);
 
         if (string.IsNullOrEmpty(apiToken))
             throw new InvalidOperationException(
-                "REDBULL_API_URL is set but REDBULL_API_TOKEN is missing");
+                "apiUrl is set (config.json or REDBULL_API_URL) but apiToken is missing");
 
         var handler = new SocketsHttpHandler
         {
@@ -25,4 +30,7 @@ public static class RedBullServiceFactory
         svc.StartPolling();
         return svc;
     }
+
+    private static string? FirstNonEmpty(string? a, string? b)
+        => !string.IsNullOrEmpty(a) ? a : b;
 }
