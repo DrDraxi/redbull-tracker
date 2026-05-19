@@ -45,7 +45,7 @@ def test_dashboard_renders_when_authed(client):
     client.post("/login", data={"token": "tok"})
     r = client.get("/")
     assert r.status_code == 200
-    assert b"Stock" in r.data
+    assert b"stock" in r.data.lower()
 
 
 def test_ui_stock_fragment(client):
@@ -54,7 +54,7 @@ def test_ui_stock_fragment(client):
     assert r.status_code == 200
     # HTML fragment, not full page
     assert b"<html" not in r.data
-    assert b"Stock" in r.data
+    assert b"stock" in r.data.lower()
 
 
 def test_ui_log_fragment(client):

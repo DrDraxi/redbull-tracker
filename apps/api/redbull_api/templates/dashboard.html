@@ -1,26 +1,55 @@
 {% extends "base.html" %}
 {% block content %}
-  <section id="stock" hx-get="/ui/stock" hx-trigger="every 5s" hx-swap="outerHTML">
+  <section id="stock-card" class="stock-card-wrap">
     {% include "partials/stock.html" %}
   </section>
 
-  <section class="actions">
-    <h2>Manual adjust</h2>
-    <form hx-post="/api/v1/adjust" hx-target="#stock" hx-swap="none">
-      <input name="type" placeholder="type (e.g. default)" required>
-      <input name="delta" type="number" required>
-      <input name="note" placeholder="note (optional)">
-      <button>Apply</button>
+  <section class="actions-grid">
+    <form class="action-card action-card--primary"
+          hx-post="/api/v1/receipts"
+          hx-encoding="multipart/form-data"
+          hx-target="#log"
+          hx-swap="outerHTML"
+          hx-on::before-request="this.classList.add('is-loading')"
+          hx-on::after-request="this.classList.remove('is-loading'); this.reset()">
+      <label class="upload-label">
+        <input type="file" name="image" accept="image/*" capture="environment" required>
+        <span class="upload-icon" aria-hidden="true">📷</span>
+        <span class="upload-title">SCAN RECEIPT</span>
+        <span class="upload-hint">Snap a photo or pick a file — Claude reads it</span>
+      </label>
+      <div class="spinner" aria-hidden="true"></div>
     </form>
 
-    <h2>Upload receipt</h2>
-    <form hx-post="/api/v1/receipts" hx-encoding="multipart/form-data" hx-target="#log" hx-swap="outerHTML">
-      <input type="file" name="image" accept="image/*" required>
-      <button>Parse with Claude</button>
-    </form>
+    <details class="action-card action-card--secondary">
+      <summary>
+        <span class="upload-icon" aria-hidden="true">✏️</span>
+        <span class="upload-title">MANUAL ADJUST</span>
+        <span class="upload-hint">Add or remove cans by hand</span>
+      </summary>
+      <form class="form-stack form-stack--inset"
+            hx-post="/api/v1/adjust"
+            hx-target="#stock-card"
+            hx-swap="outerHTML"
+            hx-on::after-request="this.reset()">
+        <label class="field">
+          <span>Type</span>
+          <input name="type" placeholder="default, sugarfree, …" value="default" required>
+        </label>
+        <label class="field">
+          <span>Delta</span>
+          <input name="delta" type="number" step="1" value="1" required>
+        </label>
+        <label class="field">
+          <span>Note (optional)</span>
+          <input name="note" placeholder="Found one in the fridge">
+        </label>
+        <button class="btn btn-primary" type="submit">Apply</button>
+      </form>
+    </details>
   </section>
 
-  <section id="log" hx-get="/ui/log" hx-trigger="every 10s" hx-swap="outerHTML">
+  <section id="log" class="log-section">
     {% include "partials/log.html" %}
   </section>
 {% endblock %}

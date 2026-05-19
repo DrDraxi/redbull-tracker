@@ -3,14 +3,27 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#001489">
   <title>{% block title %}Red Bull Tracker{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <script src="{{ url_for('static', filename='htmx.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='htmx.min.js') }}" defer></script>
 </head>
 <body>
-  <header>
-    <h1>Red Bull Tracker</h1>
-    {% if session_authed %}<form method="post" action="{{ url_for('ui.logout') }}"><button>Logout</button></form>{% endif %}
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-glow" aria-hidden="true"></div>
+  <header class="topbar">
+    <a class="brand" href="{% if session_authed %}{{ url_for('ui.dashboard') }}{% else %}{{ url_for('ui.login_form') }}{% endif %}">
+      <span class="brand-mark">⚡</span>
+      <span class="brand-name">RED BULL <em>TRACKER</em></span>
+    </a>
+    {% if session_authed %}
+      <form method="post" action="{{ url_for('ui.logout') }}">
+        <button class="btn btn-ghost" type="submit">Logout</button>
+      </form>
+    {% endif %}
   </header>
   <main>
     {% block content %}{% endblock %}

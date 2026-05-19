@@ -1,12 +1,18 @@
-<section id="stock" hx-get="/ui/stock" hx-trigger="every 5s" hx-swap="outerHTML">
-  <h2>Stock: {{ stock.total }}</h2>
-  {% if stock.by_type %}
-    <ul class="by-type">
-      {% for type, count in stock.by_type.items() %}
-        <li><strong>{{ type }}</strong>: {{ count }}</li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p>No Red Bulls in stock.</p>
-  {% endif %}
+<section id="stock-card" class="stock-card-wrap" hx-get="/ui/stock" hx-trigger="every 5s" hx-swap="outerHTML">
+  <article class="stock-card">
+    <div class="stock-label">In stock</div>
+    <div class="stock-number">{{ "%02d"|format(stock.total) }}</div>
+    {% if stock.by_type %}
+      <ul class="stock-pills">
+        {% for type, count in stock.by_type.items() %}
+          <li class="pill pill--{{ type }}">
+            <span class="pill-count">{{ count }}</span>
+            <span class="pill-type">{{ type }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="stock-empty">No Red Bulls. Get to it.</p>
+    {% endif %}
+  </article>
 </section>
