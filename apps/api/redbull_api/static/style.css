@@ -620,28 +620,78 @@ main {
   font-style: italic;
 }
 
-/* Button-as-card override for SCAN RECEIPT -------------------------------- */
+/* Scan card: camera trigger + OR + file upload --------------------------- */
 
-button.action-card {
+.scan-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 1.25rem 1rem 1rem;
+  position: relative;
+}
+
+.scan-trigger {
   font: inherit;
   color: inherit;
-  border: 1px solid var(--line);
+  background: transparent;
+  border: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   text-align: center;
-  gap: 0.5rem;
-  padding: 1.75rem 1rem;
-  width: 100%;
+  gap: 0.45rem;
+  padding: 0.75rem 0.5rem 1rem;
   cursor: pointer;
+  border-radius: 10px;
+  transition: background 120ms ease;
 }
 
-button.action-card--primary {
-  border-color: rgba(255, 209, 44, 0.25);
+.scan-trigger:hover {
+  background: rgba(255, 209, 44, 0.06);
 }
 
-button.action-card .upload-icon { font-size: 2.5rem; }
+.scan-trigger .upload-icon { font-size: 2.5rem; }
+
+.scan-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  margin: 0.25rem 0;
+}
+
+.scan-divider::before,
+.scan-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.scan-file {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.scan-file:hover {
+  color: var(--text);
+  border-color: var(--silver);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.scan-file-icon { font-size: 1.1rem; }
 
 /* Manual-adjust dropdown styling ------------------------------------------ */
 
