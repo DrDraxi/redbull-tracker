@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
+from datetime import datetime, timezone
 
-from flask import Blueprint, g, jsonify, request
+import anthropic
+from flask import Blueprint, current_app, g, jsonify, request
 
+from ..images import save_image_and_thumbnail
+from ..receipts import parse_receipt
 from ..stock import add_batch, delete_batch, get_stock, list_batches
 
 bp = Blueprint("api", __name__, url_prefix="/api/v1")
@@ -53,3 +58,60 @@ def delete(batch_id: int):
     if not ok:
         return jsonify({"error": "not_found"}), 404
     return jsonify({"stock": get_stock(g.db)})
+
+
+@bp.post("/receipts")
+def upload_receipt():
+    file = request.files.get("image")
+    if not file:
+        return jsonify({"error": "missing_image"}), 400
+
+    data = file.read()
+    if not data:
+        return jsonify({"error": "missing_image"}), 400
+
+    cfg = current_app.config["CONFIG"]
+    try:
+        saved = save_image_and_thumbnail(
+            data, content_type=file.mimetype or "image/jpeg", data_dir=cfg.data_dir
+        )
+    except ValueError:
+        return jsonify({"error": "invalid_image"}), 400
+
+    client = anthropic.Anthropic(api_key=cfg.anthropic_api_key)
+    result = parse_receipt(
+        client, image_bytes=data, media_type=file.mimetype or "image/jpeg"
+    )
+
+    # Insert receipt row
+    cur = g.db.execute(
+        "INSERT INTO receipts (filename, thumbnail, uploaded_at, model_used, raw_response, confidence) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            saved.filename,
+            saved.thumbnail,
+            datetime.now(timezone.utc).isoformat(),
+            result.model_used,
+            json.dumps(result.raw_response),
+            result.confidence,
+        ),
+    )
+    receipt_id = cur.lastrowid
+
+    # Create the batch — even with zero items when confidence == "none"
+    items = [(it["type"], it["count"]) for it in result.items]
+    batch_id = add_batch(
+        g.db, source="receipt", items=items, note=None, receipt_id=receipt_id
+    )
+
+    payload = {
+        "batch_id": batch_id,
+        "receipt_id": receipt_id,
+        "items": result.items,
+        "confidence": result.confidence,
+        "stock": get_stock(g.db),
+    }
+    if result.confidence == "none":
+        payload["error"] = "no_redbulls_found"
+        return jsonify(payload), 422
+    return jsonify(payload)
