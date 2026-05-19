@@ -1,9 +1,7 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "cd apps/api && uv sync --frozen"
 
 [deploy]
-startCommand = "cd apps/api && uv run gunicorn --bind 0.0.0.0:$PORT --workers 2 --access-logfile - 'redbull_api.app:create_app()'"
 healthcheckPath = "/api/v1/health"
 healthcheckTimeout = 10
 restartPolicyType = "ON_FAILURE"

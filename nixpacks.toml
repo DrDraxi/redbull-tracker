@@ -1,0 +1,14 @@
+[phases.setup]
+nixPkgs = ["python312", "gcc"]
+
+[phases.install]
+cmds = [
+  "pip install uv",
+  "cd apps/api && uv sync --frozen"
+]
+
+[phases.build]
+cmds = ["echo build-phase noop"]
+
+[start]
+cmd = "cd apps/api && uv run gunicorn --bind 0.0.0.0:$PORT --workers 2 --access-logfile - 'redbull_api.app:create_app()'"
