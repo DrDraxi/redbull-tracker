@@ -10,7 +10,7 @@ import anthropic
 from flask import Blueprint, current_app, g, jsonify, request, send_from_directory
 
 from ..images import save_image_and_thumbnail
-from ..prices import list_prices, refresh_from_tesco
+from ..prices import add_price, delete_price, list_prices, refresh_from_web
 from ..receipts import parse_receipt
 from ..stock import add_batch, delete_batch, get_stock, list_batches
 
@@ -134,6 +134,28 @@ def get_prices():
     return jsonify({"prices": list_prices(g.db)})
 
 
+@bp.post("/prices")
+def create_price():
+    data = request.get_json(silent=True) or request.form or {}
+    type_ = (data.get("type") or "").strip().lower()
+    url = (data.get("url") or "").strip()
+    label = (data.get("label") or "").strip()
+    if not type_:
+        return jsonify({"error": "invalid_type"}), 400
+    if not url or not (url.startswith("http://") or url.startswith("https://")):
+        return jsonify({"error": "invalid_url"}), 400
+    row = add_price(g.db, type=type_, url=url, label=label or None)
+    return jsonify({"price": row}), 201
+
+
+@bp.delete("/prices/<type_>")
+def remove_price(type_: str):
+    ok = delete_price(g.db, type_)
+    if not ok:
+        return jsonify({"error": "not_found"}), 404
+    return jsonify({"prices": list_prices(g.db)})
+
+
 @bp.post("/prices/refresh")
 def refresh_prices():
     cfg = current_app.config["CONFIG"]
@@ -141,7 +163,7 @@ def refresh_prices():
         return jsonify({"error": "anthropic_key_missing"}), 503
     client = anthropic.Anthropic(api_key=cfg.anthropic_api_key)
     try:
-        fetched = refresh_from_tesco(client, g.db)
+        fetched = refresh_from_web(client, g.db)
     except anthropic.APIError as e:
         return jsonify({"error": "anthropic_error", "detail": str(e)[:300]}), 502
     return jsonify({

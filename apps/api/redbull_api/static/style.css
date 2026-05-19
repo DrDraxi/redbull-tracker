@@ -363,29 +363,55 @@ main {
 }
 
 .price-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.25rem;
-  padding: 0.9rem 1rem;
+  position: relative;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--line);
   border-radius: 12px;
-  text-decoration: none;
-  color: var(--text);
-  transition: border-color 120ms ease, transform 120ms ease, background 120ms ease;
-  position: relative;
   overflow: hidden;
+  transition: border-color 120ms ease, background 120ms ease;
 }
 
 .price-card:hover {
   border-color: var(--rb-yellow);
   background: rgba(255, 209, 44, 0.06);
-  transform: translateY(-1px);
+}
+
+.price-card-link {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding: 0.9rem 1rem;
+  text-decoration: none;
+  color: var(--text);
 }
 
 .price-card--default { border-left: 3px solid var(--rb-red); }
 .price-card--sugarfree { border-left: 3px solid #2563EB; }
+
+.price-remove {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.4rem;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.price-card:hover .price-remove { opacity: 1; }
+
+.price-remove:hover {
+  color: var(--rb-red);
+  border-color: var(--rb-red);
+}
 
 .price-label {
   font-size: 0.75rem;
@@ -438,14 +464,38 @@ main {
   font-size: 0.75rem;
 }
 
-.price-refresh {
-  align-self: center;
-  margin-top: 0.5rem;
-}
-
 .price-refresh.is-loading {
   opacity: 0.6;
   cursor: progress;
+}
+
+.price-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.price-add summary {
+  list-style: none;
+  display: inline-block;
+}
+.price-add summary::-webkit-details-marker { display: none; }
+.price-add[open] summary { display: none; }
+
+.price-add-form {
+  margin-top: 0.6rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: 100%;
+  max-width: 360px;
 }
 
 /* Actions grid ------------------------------------------------------------- */

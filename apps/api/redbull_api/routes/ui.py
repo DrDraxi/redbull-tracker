@@ -75,7 +75,7 @@ def dashboard():
     return render_template(
         "dashboard.html",
         stock=stock,
-        prices=list_prices(g.db) if stock["total"] == 0 else [],
+        prices=list_prices(g.db) if stock["total"] == 0 else None,
         batches=list_batches(g.db, limit=50),
         session_authed=True,
     )
@@ -89,7 +89,7 @@ def stock_fragment():
     return render_template(
         "partials/stock.html",
         stock=stock,
-        prices=list_prices(g.db) if stock["total"] == 0 else [],
+        prices=list_prices(g.db) if stock["total"] == 0 else None,
     )
 
 

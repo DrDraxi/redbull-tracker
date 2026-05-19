@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v3.0.0] - 2026-05-19
+
+Big release. RedBull Tracker now has an optional cloud backend so the widget
+can sync across machines, log purchases from receipt photos, and even
+surface real-time grocery prices when stock hits zero.
+
+### Added
+
+#### Cloud API (`apps/api/`)
+- Flask + SQLite backend with per-type stock, manual adjust, and activity log
+  with one-tap reversal
+- Receipt scanning: upload a photo, Claude vision (Haiku 4.5 primary, Sonnet
+  4.6 fallback on low confidence) extracts Red Bull line items and updates
+  stock automatically
+- Camera capture or file upload from the dashboard
+- Bearer-token + signed-cookie auth (shared secret, internet-safe)
+- Tesco / any-grocery-store price lookup via Claude's `web_fetch` server
+  tool — users can add product URLs from any store, dashboard shows
+  normal + loyalty-card price when stock is empty
+- Dockerfile + `railway.toml` for one-command deploys to Railway
+
+#### Web dashboard
+- Red Bull-styled dark UI (Anton display + Inter body, electric yellow
+  accents)
+- Camera capture button using `<input type="file" capture="environment">`
+  for mobile, falls through to file picker on desktop
+- Type dropdown on manual adjust with Tesco CZ Red Bull SKUs (default,
+  sugarfree, zero, plus seasonal editions and a custom "other" slot)
+- Activity log with receipt thumbnails inline
+
+#### Widget API mode
+- New `apiUrl` + `apiToken` fields in `config.json` (env vars
+  `REDBULL_API_URL` / `REDBULL_API_TOKEN` override during dev)
+- Polls the API every 5s and renders mixed-type cans in the right order
+- Per-can left-click drinks one of that specific type via the API
+- Right-click adding stays offline-mode-only
+- Stale-state dimming when the API is unreachable
+
+### Changed
+- Repo is now a monorepo: widget at `apps/widget/`, API at `apps/api/`
+- `IRedBullService.RemoveCanAsync()` takes an optional type parameter
+- CI split into `ci-widget.yml` (path-filtered to widget changes) and
+  new `ci-api.yml`
+
+### Removed
+- Custom `getUserMedia` camera modal (native `capture` attribute is simpler
+  and the user's OS camera UI is what they expect)
+
 ## [v2.0.5] - 2026-02-17
 
 ### Fixed
