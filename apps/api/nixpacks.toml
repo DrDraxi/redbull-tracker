@@ -1,0 +1,5 @@
+[phases.setup]
+nixPkgs = ["python312", "gcc"]
+
+[phases.install]
+cmds = ["pip install uv", "uv sync --frozen"]
