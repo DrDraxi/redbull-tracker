@@ -15,6 +15,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Tests\**\*" />
+    <EmbeddedResource Remove="Tests\**\*" />
+    <None Remove="Tests\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\lib\taskbar-widget\src\TaskbarWidget\TaskbarWidget.csproj" />
   </ItemGroup>
 
