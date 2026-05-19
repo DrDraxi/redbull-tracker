@@ -46,6 +46,8 @@ Configuration is stored in `%LOCALAPPDATA%\RedBullTracker\config.json`:
 
 ## Building from Source
 
+This is a monorepo. The widget lives in `apps/widget/`; the API will live in `apps/api/` (in progress).
+
 ```bash
 # Clone with submodules
 git clone --recursive https://github.com/user/redbull-tracker.git
@@ -55,7 +57,7 @@ cd redbull-tracker
 dotnet build -p:Platform=x64
 
 # Run
-dotnet run --project src/RedBullTracker/RedBullTracker.csproj -p:Platform=x64
+dotnet run --project apps/widget/RedBullTracker.csproj -p:Platform=x64
 ```
 
 ## Requirements

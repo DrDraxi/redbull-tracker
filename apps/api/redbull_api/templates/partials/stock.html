@@ -1,0 +1,80 @@
+<section id="stock-card" class="stock-card-wrap" hx-get="/ui/stock" hx-trigger="every 5s" hx-swap="outerHTML">
+  <article class="stock-card">
+    <div class="stock-label">In stock</div>
+    <div class="stock-number">{{ "%02d"|format(stock.total) }}</div>
+    {% if stock.by_type %}
+      <ul class="stock-pills">
+        {% for type, count in stock.by_type.items() %}
+          <li class="pill pill--{{ type }}">
+            <span class="pill-count">{{ count }}</span>
+            <span class="pill-type">{{ type }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="stock-empty">No Red Bulls. Get one.</p>
+      {% if prices is not none %}
+        {% if prices %}
+          <div class="price-grid">
+            {% for p in prices %}
+              <div class="price-card price-card--{{ p.type }}">
+                <a class="price-card-link" href="{{ p.url }}" target="_blank" rel="noopener">
+                  <span class="price-label">{{ p.label or p.type }}</span>
+                  {% if p.price_normal is not none %}
+                    {% if p.price_clubcard is not none and p.price_clubcard < p.price_normal %}
+                      <span class="price-clubcard">{{ "%.2f"|format(p.price_clubcard) }} {{ p.currency }}</span>
+                      <span class="price-strike">{{ "%.2f"|format(p.price_normal) }} {{ p.currency }}</span>
+                      <span class="price-badge">Loyalty</span>
+                    {% else %}
+                      <span class="price-normal">{{ "%.2f"|format(p.price_normal) }} {{ p.currency }}</span>
+                    {% endif %}
+                  {% else %}
+                    <span class="price-unknown">— tap refresh —</span>
+                  {% endif %}
+                </a>
+                <button class="price-remove"
+                        type="button"
+                        title="Stop tracking this product"
+                        hx-delete="/api/v1/prices/{{ p.type }}"
+                        hx-swap="none"
+                        hx-confirm="Stop tracking {{ p.label or p.type }}?"
+                        hx-on::after-request="htmx.ajax('GET', '/ui/stock', {target: '#stock-card', swap: 'outerHTML'})">✕</button>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        <div class="price-actions">
+          <button class="btn btn-ghost btn-sm price-refresh"
+                  type="button"
+                  hx-post="/api/v1/prices/refresh"
+                  hx-swap="none"
+                  hx-on::before-request="this.classList.add('is-loading'); this.disabled = true"
+                  hx-on::after-request="this.classList.remove('is-loading'); this.disabled = false; htmx.ajax('GET', '/ui/stock', {target: '#stock-card', swap: 'outerHTML'});">
+            ↻ Refresh prices
+          </button>
+          <details class="price-add">
+            <summary class="btn btn-ghost btn-sm">+ Add product</summary>
+            <form class="price-add-form"
+                  hx-post="/api/v1/prices"
+                  hx-swap="none"
+                  hx-on::after-request="this.reset(); this.closest('details').open = false; htmx.ajax('POST', '/api/v1/prices/refresh', {swap: 'none'}).then(() => htmx.ajax('GET', '/ui/stock', {target: '#stock-card', swap: 'outerHTML'}));">
+              <label class="field">
+                <span>Type slug</span>
+                <input name="type" placeholder="e.g. watermelon, lidl-default" required pattern="[a-z0-9_-]+">
+              </label>
+              <label class="field">
+                <span>URL</span>
+                <input name="url" type="url" placeholder="https://…store…/product/123" required>
+              </label>
+              <label class="field">
+                <span>Label (optional)</span>
+                <input name="label" placeholder="auto-filled by Claude if blank">
+              </label>
+              <button class="btn btn-primary btn-sm" type="submit">Track product</button>
+            </form>
+          </details>
+        </div>
+      {% endif %}
+    {% endif %}
+  </article>
+</section>

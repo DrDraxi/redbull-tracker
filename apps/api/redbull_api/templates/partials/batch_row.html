@@ -1,0 +1,36 @@
+{% set items = batch["items"] %}
+{% set receipt = batch["receipt"] %}
+<li class="log-row log-row--{{ batch.source }}" id="batch-{{ batch.id }}">
+  {% if receipt %}
+    <a class="log-thumb" href="/api/v1/receipts/{{ receipt.id }}/image" target="_blank" rel="noopener">
+      <img src="/api/v1/receipts/{{ receipt.id }}/thumb" alt="receipt thumbnail" loading="lazy">
+    </a>
+  {% else %}
+    <div class="log-thumb log-thumb--placeholder" aria-hidden="true">
+      {% if batch.source == 'manual' %}✏️{% else %}🧾{% endif %}
+    </div>
+  {% endif %}
+  <div class="log-body">
+    <div class="log-line-top">
+      <span class="log-source">{{ batch.source }}</span>
+      <span class="log-time" title="{{ batch.created_at }}">{{ batch.created_at[:16].replace("T", " ") }}</span>
+    </div>
+    <div class="log-items">
+      {% if items %}
+        {% for it in items %}
+          {% set sign = "+" if it.delta > 0 else "" %}
+          <span class="chip chip--{{ 'add' if it.delta > 0 else 'sub' }}">{{ sign }}{{ it.delta }} {{ it.type }}</span>
+        {% endfor %}
+      {% else %}
+        <span class="chip chip--ghost">no items detected</span>
+      {% endif %}
+    </div>
+    {% if batch.note %}<p class="log-note">{{ batch.note }}</p>{% endif %}
+  </div>
+  <button class="log-delete"
+          hx-delete="/api/v1/batches/{{ batch.id }}"
+          hx-swap="none"
+          hx-on::after-request="htmx.ajax('GET', '/ui/stock', {target: '#stock-card', swap: 'outerHTML'}); htmx.ajax('GET', '/ui/log', {target: '#log', swap: 'outerHTML'});"
+          hx-confirm="Delete this entry? Stock will be reversed."
+          aria-label="Delete">✕</button>
+</li>

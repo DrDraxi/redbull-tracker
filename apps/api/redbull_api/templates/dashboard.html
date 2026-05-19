@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block content %}
+  <section id="stock-card" class="stock-card-wrap">
+    {% include "partials/stock.html" %}
+  </section>
+
+  <section class="actions-grid">
+    <div class="action-card action-card--primary scan-card" id="scan-card">
+      <label class="scan-trigger">
+        <input type="file" accept="image/*" capture="environment" id="scan-camera-input" hidden>
+        <span class="upload-icon" aria-hidden="true">📷</span>
+        <span class="upload-title">SCAN RECEIPT</span>
+        <span class="upload-hint">Tap to open camera</span>
+      </label>
+      <div class="scan-divider"><span>OR</span></div>
+      <label class="scan-file">
+        <input type="file" accept="image/*" id="scan-file-input" hidden>
+        <span class="scan-file-icon" aria-hidden="true">📁</span>
+        <span class="scan-file-text">Upload an image</span>
+      </label>
+      <div class="spinner" aria-hidden="true"></div>
+    </div>
+
+    <details class="action-card action-card--secondary">
+      <summary>
+        <span class="upload-icon" aria-hidden="true">✏️</span>
+        <span class="upload-title">MANUAL ADJUST</span>
+        <span class="upload-hint">Add or remove cans by hand</span>
+      </summary>
+      <form id="adjust-form"
+            class="form-stack form-stack--inset"
+            hx-post="/api/v1/adjust"
+            hx-swap="none"
+            hx-on::after-request="this.reset(); document.getElementById('type-other').hidden = true; htmx.ajax('GET', '/ui/stock', {target: '#stock-card', swap: 'outerHTML'}); htmx.ajax('GET', '/ui/log', {target: '#log', swap: 'outerHTML'});">
+        <label class="field">
+          <span>Type</span>
+          <select name="type" id="type-select" required>
+            <optgroup label="Core">
+              <option value="default">Red Bull Energy (original)</option>
+              <option value="sugarfree" selected>Sugarfree</option>
+              <option value="zero">Zero</option>
+            </optgroup>
+            <optgroup label="Editions">
+              <option value="tropical">Tropical (yellow)</option>
+              <option value="watermelon">Watermelon (red)</option>
+              <option value="coconut">Coconut Berry (white)</option>
+              <option value="peach">Peach (peach)</option>
+              <option value="summer">Summer Edition</option>
+              <option value="winter">Winter Edition</option>
+            </optgroup>
+            <option value="__other__">Other…</option>
+          </select>
+        </label>
+        <label class="field" id="type-other" hidden>
+          <span>Custom type</span>
+          <input name="type_custom" placeholder="lowercase keyword, e.g. apricot">
+        </label>
+        <label class="field">
+          <span>Delta</span>
+          <input name="delta" type="number" step="1" value="1" required>
+        </label>
+        <label class="field">
+          <span>Note (optional)</span>
+          <input name="note" placeholder="Found one in the fridge">
+        </label>
+        <button class="btn btn-primary" type="submit">Apply</button>
+      </form>
+    </details>
+  </section>
+
+  <section id="log" class="log-section">
+    {% include "partials/log.html" %}
+  </section>
+
+  <script>
+  // ===== Manual-adjust dropdown: reveal custom input when "Other…" picked =====
+  (function() {
+    const select = document.getElementById('type-select');
+    const other = document.getElementById('type-other');
+    const otherInput = other.querySelector('input');
+    const form = document.getElementById('adjust-form');
+    if (!select) return;
+
+    select.addEventListener('change', () => {
+      const isOther = select.value === '__other__';
+      other.hidden = !isOther;
+      if (isOther) otherInput.focus();
+    });
+
+    // On submit, swap the select value with the custom one if "Other…" picked
+    form.addEventListener('submit', (e) => {
+      if (select.value === '__other__') {
+        const custom = (otherInput.value || '').trim().toLowerCase();
+        if (!custom) {
+          e.preventDefault();
+          otherInput.focus();
+          return;
+        }
+        // Hijack: temporarily change the select option so HTMX sends the custom value
+        const opt = select.querySelector('option[value="__other__"]');
+        opt.value = custom;
+        // Restore after submit so future "Other…" still works
+        setTimeout(() => { opt.value = '__other__'; }, 0);
+      }
+    }, true);
+  })();
+
+  // ===== Receipt upload (camera capture via native file input + plain upload) =====
+  (function() {
+    const scanCard = document.getElementById('scan-card');
+    const camInput = document.getElementById('scan-camera-input');
+    const fileInput = document.getElementById('scan-file-input');
+
+    async function refreshFragments() {
+      try {
+        const [logResp, stockResp] = await Promise.all([
+          fetch('/ui/log', { credentials: 'same-origin' }),
+          fetch('/ui/stock', { credentials: 'same-origin' }),
+        ]);
+        if (logResp.ok) {
+          const wrap = document.createElement('div');
+          wrap.innerHTML = await logResp.text();
+          const fresh = wrap.firstElementChild;
+          if (fresh) document.getElementById('log').replaceWith(fresh);
+        }
+        if (stockResp.ok) {
+          const wrap = document.createElement('div');
+          wrap.innerHTML = await stockResp.text();
+          const fresh = wrap.firstElementChild;
+          if (fresh) document.getElementById('stock-card').replaceWith(fresh);
+        }
+      } catch (_) { /* ignore */ }
+    }
+
+    async function uploadFile(file) {
+      const fd = new FormData();
+      fd.append('image', file, file.name || 'receipt.jpg');
+      scanCard.classList.add('is-loading');
+      try {
+        const resp = await fetch('/api/v1/receipts', {
+          method: 'POST',
+          body: fd,
+          credentials: 'same-origin',
+        });
+        await refreshFragments();
+        if (!resp.ok && resp.status !== 422) {
+          const text = await resp.text();
+          alert(`Upload failed (${resp.status}): ${text.slice(0, 200)}`);
+        }
+      } catch (err) {
+        alert(`Upload failed: ${err.message || err}`);
+      } finally {
+        scanCard.classList.remove('is-loading');
+      }
+    }
+
+    function wire(input) {
+      input.addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = '';  // allow re-selecting the same file
+        if (file) await uploadFile(file);
+      });
+    }
+
+    wire(camInput);
+    wire(fileInput);
+  })();
+  </script>
+{% endblock %}

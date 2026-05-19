@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Sign in — Red Bull Tracker{% endblock %}
+{% block content %}
+  <section class="login-card">
+    <h1 class="title-xl">GET <em>WINGS</em></h1>
+    <p class="subtitle">Enter your access token to track your stock.</p>
+    <form method="post" action="{{ url_for('ui.login_submit') }}" class="form-stack">
+      <label class="field">
+        <span>Token</span>
+        <input type="password" name="token" autocomplete="current-password" autofocus required>
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+      {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    </form>
+  </section>
+{% endblock %}
