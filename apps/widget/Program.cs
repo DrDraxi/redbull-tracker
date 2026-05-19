@@ -9,11 +9,11 @@ public static class Program
     public static void Main(string[] args)
     {
         var settings = new SettingsService();
-        var service = new OfflineRedBullService(settings);
+        var service = RedBullServiceFactory.Create(settings);
 
         StartupService.SyncWithConfig(settings.Config.StartWithWindows);
 
-        var widget = new RedBullWidget(service, settings.Config.CanType);
+        var widget = new RedBullWidget(service);
         widget.Initialize();
 
         TaskbarWidget.Widget.RunMessageLoop();

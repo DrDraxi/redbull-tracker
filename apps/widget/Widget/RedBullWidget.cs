@@ -11,16 +11,15 @@ public class RedBullWidget : IDisposable
     private const int CanSpacing = 2;
 
     private readonly IRedBullService _service;
-    private readonly string _canType;
     private TaskbarWidget.Widget? _widget;
-    private WidgetImage? _canImage;
-    private WidgetImage? _emptyImage;
+    private readonly Dictionary<string, WidgetImage> _icons = new();
+    private WidgetImage? _genericIcon;
+    private WidgetImage? _emptyIcon;
     private bool _disposed;
 
-    public RedBullWidget(IRedBullService service, string canType = "default")
+    public RedBullWidget(IRedBullService service)
     {
         _service = service;
-        _canType = canType;
         _service.CountChanged += OnCountChanged;
     }
 
@@ -32,39 +31,68 @@ public class RedBullWidget : IDisposable
         {
             ctx.Panel(p =>
             {
-                int count = _service.Count;
+                var byType = _service.ByType;
+                int total = _service.Count;
+                bool stale = (_service as ApiRedBullService)?.IsStale ?? false;
 
                 p.Horizontal(CanSpacing, h =>
                 {
-                    if (count == 0)
+                    if (total == 0)
                     {
-                        h.DrawImage(_emptyImage!, widthDip: CanWidthDip, heightDip: CanHeightDip);
+                        h.DrawImage(_emptyIcon!, widthDip: CanWidthDip, heightDip: CanHeightDip);
                     }
                     else
                     {
-                        for (int i = 0; i < count; i++)
-                            h.DrawImage(_canImage!, widthDip: CanWidthDip, heightDip: CanHeightDip);
+                        // Stable ordering across renders
+                        foreach (var (type, count) in byType.OrderBy(kv => kv.Key))
+                        {
+                            var icon = GetIcon(type);
+                            for (int i = 0; i < count; i++)
+                                h.DrawImage(icon, widthDip: CanWidthDip, heightDip: CanHeightDip);
+                        }
                     }
                 });
 
-                p.OnClick(() => _ = _service.RemoveCanAsync());
-                p.OnRightClick(() => _ = _service.AddCanAsync());
-                p.Tooltip($"Red Bulls: {count}\nLeft-click: Remove | Right-click: Add");
+                if (!_service.IsReadOnly)
+                {
+                    p.OnClick(() => _ = _service.RemoveCanAsync());
+                    p.OnRightClick(() => _ = _service.AddCanAsync());
+                }
+
+                p.Tooltip(BuildTooltip(byType, total, stale));
             });
         });
 
         _widget.Show();
     }
 
+    private string BuildTooltip(IReadOnlyDictionary<string, int> byType, int total, bool stale)
+    {
+        if (_service.IsReadOnly)
+        {
+            string staleNote = stale ? " (stale)" : "";
+            if (total == 0)
+                return $"Red Bulls: 0\nSynced from API{staleNote}";
+            var breakdown = string.Join(", ", byType.OrderBy(kv => kv.Key).Select(kv => $"{kv.Value} {kv.Key}"));
+            return $"Red Bulls: {breakdown} ({total} total)\nSynced from API{staleNote}";
+        }
+        return $"Red Bulls: {total}\nLeft-click: Remove | Right-click: Add";
+    }
+
+    private WidgetImage GetIcon(string type)
+    {
+        if (_icons.TryGetValue(type, out var icon))
+            return icon;
+        return _genericIcon!;
+    }
+
     private void LoadImages()
     {
         var asm = typeof(RedBullWidget).Assembly;
-        var canFileName = _canType?.ToLowerInvariant() == "sugarfree"
-            ? "redbull-sugarfree.png"
-            : "redbull-default.png";
-
-        _canImage = WidgetImage.FromResource(asm, $"RedBullTracker.Assets.{canFileName}");
-        _emptyImage = WidgetImage.FromResource(asm, "RedBullTracker.Assets.redbull-empty.png");
+        _icons["default"] = WidgetImage.FromResource(asm, "RedBullTracker.Assets.redbull-default.png");
+        _icons["sugarfree"] = WidgetImage.FromResource(asm, "RedBullTracker.Assets.redbull-sugarfree.png");
+        _genericIcon = WidgetImage.FromResource(asm, "RedBullTracker.Assets.redbull-generic.png");
+        _emptyIcon = WidgetImage.FromResource(asm, "RedBullTracker.Assets.redbull-empty.png");
     }
 
     private void OnCountChanged(object? sender, EventArgs e)
@@ -78,5 +106,6 @@ public class RedBullWidget : IDisposable
         _disposed = true;
         _service.CountChanged -= OnCountChanged;
         _widget?.Dispose();
+        (_service as IDisposable)?.Dispose();
     }
 }
