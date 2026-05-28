@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import base64
+import io
 from dataclasses import dataclass
 from typing import Any
 
 import anthropic
+from PIL import Image
+
+# Anthropic caps each image at 5 MB of base64 (~3.75 MB raw). Stay under
+# with headroom so a marginal photo doesn't trip the limit.
+_MAX_RAW_BYTES = 3_500_000
 
 MODEL_PRIMARY = "claude-haiku-4-5"
 MODEL_FALLBACK = "claude-sonnet-4-6"
@@ -118,12 +124,28 @@ def _call_claude(
     return {"items": [], "confidence": "none"}
 
 
+def _shrink_for_claude(image_bytes: bytes, media_type: str) -> tuple[bytes, str]:
+    if len(image_bytes) <= _MAX_RAW_BYTES:
+        return image_bytes, media_type
+
+    with Image.open(io.BytesIO(image_bytes)) as img:
+        rgb = img.convert("RGB")
+        rgb.thumbnail((2000, 2000))
+        for quality in (85, 75, 65, 55):
+            buf = io.BytesIO()
+            rgb.save(buf, "JPEG", quality=quality, optimize=True)
+            if buf.tell() <= _MAX_RAW_BYTES:
+                return buf.getvalue(), "image/jpeg"
+        return buf.getvalue(), "image/jpeg"
+
+
 def parse_receipt(
     client: anthropic.Anthropic,
     *,
     image_bytes: bytes,
     media_type: str,
 ) -> ParseResult:
+    image_bytes, media_type = _shrink_for_claude(image_bytes, media_type)
     image_b64 = base64.standard_b64encode(image_bytes).decode("ascii")
 
     # Primary call

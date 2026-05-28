@@ -55,6 +55,11 @@ public class RedBullWidget : IDisposable
                                 {
                                     can.DrawImage(icon, CanWidthDip, CanHeightDip);
                                     can.OnClick(() => _ = _service.RemoveCanAsync(canType));
+                                    // No event bubbling: a can panel is the deepest
+                                    // hit target, so right-click-to-add must live
+                                    // here too or it's shadowed once any can exists.
+                                    if (!_service.IsReadOnly)
+                                        can.OnRightClick(() => _ = _service.AddCanAsync());
                                     can.Tooltip($"Drink one {canType}");
                                 });
                             }

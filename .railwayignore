@@ -1,0 +1,30 @@
+# VCS & CI metadata
+.git/
+.github/
+.gitmodules
+
+# Docs (not needed at build time)
+docs/
+*.md
+
+# .NET widget app and its submodule - not part of the API deploy
+apps/widget/
+lib/
+RedBullTracker.sln
+publish/
+**/[Bb]in/
+**/[Oo]bj/
+
+# Python build/test artifacts
+**/.venv/
+**/.pytest_cache/
+**/__pycache__/
+**/*.pyc
+apps/api/tests/
+
+# IDE / editor
+.vs/
+.idea/
+*.user
+*.suo
+*.stackdump

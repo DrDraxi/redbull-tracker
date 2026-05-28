@@ -1,10 +1,14 @@
+import io
 import json
 from unittest.mock import MagicMock
 
 import pytest
+from PIL import Image
 
 from redbull_api.receipts import (
     ParseResult,
+    _MAX_RAW_BYTES,
+    _shrink_for_claude,
     parse_receipt,
 )
 
@@ -60,6 +64,28 @@ def test_none_confidence_returns_empty_items_no_retry():
     assert result.items == []
     assert result.confidence == "none"
     assert client.messages.create.call_count == 1
+
+
+def test_shrink_passthrough_when_small():
+    small = b"\xff\xd8" + b"\x00" * 1024
+    out_bytes, out_media = _shrink_for_claude(small, "image/jpeg")
+    assert out_bytes is small
+    assert out_media == "image/jpeg"
+
+
+def test_shrink_downscales_oversized_image():
+    # 6000x4000 noise compresses poorly enough to exceed the limit as JPEG.
+    img = Image.effect_noise((6000, 4000), 64).convert("RGB")
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=95)
+    huge = buf.getvalue()
+    assert len(huge) > _MAX_RAW_BYTES
+
+    out_bytes, out_media = _shrink_for_claude(huge, "image/jpeg")
+    assert len(out_bytes) <= _MAX_RAW_BYTES
+    assert out_media == "image/jpeg"
+    # Result is still a valid JPEG
+    Image.open(io.BytesIO(out_bytes)).verify()
 
 
 def test_low_then_low_keeps_sonnet_result():

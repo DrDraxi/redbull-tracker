@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v3.0.1] - 2026-05-28
+
+### Fixed
+
+- Offline widget could only ever hold one can: right-click-to-add was
+  registered on the parent panel only, but per-can panels are the deepest
+  hit target (no event bubbling), so the add was shadowed once any can
+  existed. Right-click-to-add is now wired on each can in offline mode.
+- Receipt upload returned a 500 for large photos: images over Anthropic's
+  5 MB limit are now downscaled (max 2000 px, JPEG) before being sent to
+  Claude, with the original still stored unchanged.
+
 ## [v3.0.0] - 2026-05-19
 
 Big release. RedBull Tracker now has an optional cloud backend so the widget
