@@ -12,6 +12,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_from_directory,
     url_for,
 )
 
@@ -32,6 +33,17 @@ def _is_authed() -> bool:
     cfg: Config = current_app.config["CONFIG"]
     cookie = request.cookies.get(COOKIE_NAME)
     return check_cookie(cookie, secret=cfg.cookie_secret, max_age_seconds=COOKIE_MAX_AGE)
+
+
+@bp.get("/sw.js")
+def service_worker():
+    # Served from root so the worker can control the whole "/" scope.
+    resp = make_response(
+        send_from_directory(current_app.static_folder, "sw.js", mimetype="text/javascript")
+    )
+    resp.headers["Service-Worker-Allowed"] = "/"
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
 
 
 @bp.get("/login")

@@ -71,3 +71,25 @@ def test_logout_clears_cookie(client):
     assert r.status_code == 302
     set_cookie = r.headers.get("Set-Cookie", "")
     assert "redbull_session=" in set_cookie
+
+
+def test_manifest_served_without_auth(client):
+    r = client.get("/static/manifest.webmanifest")
+    assert r.status_code == 200
+    assert b"Red Bull Tracker" in r.data
+    assert b"standalone" in r.data
+
+
+def test_service_worker_served_at_root_with_scope_header(client):
+    r = client.get("/sw.js")
+    assert r.status_code == 200
+    assert "javascript" in r.headers["Content-Type"]
+    # Must be allowed to control the whole "/" scope.
+    assert r.headers.get("Service-Worker-Allowed") == "/"
+
+
+def test_login_page_links_pwa_metadata(client):
+    r = client.get("/login")
+    assert b"manifest.webmanifest" in r.data
+    assert b"apple-touch-icon" in r.data
+    assert b"serviceWorker" in r.data

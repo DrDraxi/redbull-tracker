@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- The web dashboard is now an installable Progressive Web App (PWA). A web
+  manifest, app icons (including a maskable icon and Apple touch icon), and a
+  service worker let you install Red Bull Tracker to your home screen or
+  desktop and launch it in a standalone window. The service worker caches the
+  app shell for basic offline loading.
+
 ## [v3.0.1] - 2026-05-28
 
 ### Fixed
