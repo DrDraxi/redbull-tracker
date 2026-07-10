@@ -1,6 +1,7 @@
 """Migration tests: widening batches.source to allow 'photo'."""
 
 import sqlite3
+import threading
 from pathlib import Path
 
 from redbull_api.db import _allow_photo_batch_source, connect, init_db
@@ -84,6 +85,55 @@ def test_migration_allows_photo_and_preserves_data(tmp_path: Path):
         except sqlite3.IntegrityError:
             rejected = True
         assert rejected
+    finally:
+        conn.close()
+
+
+def test_concurrent_migration_is_safe(tmp_path: Path):
+    """Several workers booting at once must not corrupt or lose data.
+
+    Each thread opens its own connection (as a gunicorn worker would) and runs
+    the migration simultaneously. Exactly one should rebuild; the rest block on
+    the write lock and then skip. No exceptions, and the pre-existing row must
+    survive.
+    """
+    db = tmp_path / "old.db"
+    _make_old_db(db)
+
+    errors: list[Exception] = []
+    barrier = threading.Barrier(5)
+
+    def worker():
+        conn = connect(db)
+        try:
+            barrier.wait()  # maximise overlap
+            _allow_photo_batch_source(conn)
+        except Exception as e:  # noqa: BLE001 - record for assertion
+            errors.append(e)
+        finally:
+            conn.close()
+
+    threads = [threading.Thread(target=worker) for _ in range(5)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors, f"migration raced: {errors}"
+
+    conn = connect(db)
+    try:
+        # Data preserved exactly once (no duplication, no loss).
+        rows = conn.execute("SELECT source FROM batches WHERE id = 7").fetchall()
+        assert len(rows) == 1 and rows[0]["source"] == "manual"
+        assert conn.execute("SELECT delta FROM batch_items WHERE batch_id = 7").fetchone()["delta"] == 5
+        # Constraint widened...
+        conn.execute("INSERT INTO batches (source, created_at) VALUES ('photo', 't')")
+        # ...and no half-finished rebuild left the temp table behind.
+        leftover = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name = 'batches_new'"
+        ).fetchone()
+        assert leftover is None
     finally:
         conn.close()
 

@@ -15,6 +15,9 @@ def connect(db_path: Path) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
+    # Wait for a concurrent writer instead of failing fast — matters when
+    # several gunicorn workers boot at once and one is running a migration.
+    conn.execute("PRAGMA busy_timeout = 15000")
     return conn
 
 
@@ -40,40 +43,58 @@ def _allow_photo_batch_source(conn: sqlite3.Connection) -> None:
     would reject photo batches. SQLite can't ALTER a CHECK, so we rebuild the
     table following the documented 12-step procedure, preserving row ids (and
     therefore batch_items references).
+
+    Concurrency: gunicorn boots several workers that each call ``init_db``. The
+    rebuild ``DROP TABLE batches`` must run at most once, so we take the write
+    lock up front with ``BEGIN IMMEDIATE`` and re-check the schema inside it.
+    Only the first worker migrates; the others block on the lock, then observe
+    the already-widened constraint and skip. Without this a race could drop the
+    table out from under a concurrent worker.
     """
+    # Cheap pre-check outside any lock: skip entirely (no write lock) once the
+    # schema is already current, which is every boot after the first migration.
     row = conn.execute(
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='batches'"
     ).fetchone()
     if not row or "'photo'" in row["sql"]:
         return  # fresh schema already includes 'photo', or table absent
 
+    # PRAGMA foreign_keys is a no-op inside a transaction, so toggle it outside.
     conn.execute("PRAGMA foreign_keys=OFF")
-    conn.execute("BEGIN")
     try:
-        conn.execute(
-            """
-            CREATE TABLE batches_new (
-                id           INTEGER PRIMARY KEY AUTOINCREMENT,
-                source       TEXT NOT NULL CHECK (source IN ('receipt', 'manual', 'photo')),
-                created_at   TEXT NOT NULL,
-                note         TEXT,
-                receipt_id   INTEGER REFERENCES receipts(id) ON DELETE SET NULL
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            # Re-check under the lock: a racing worker may have just migrated.
+            row = conn.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='batches'"
+            ).fetchone()
+            if not row or "'photo'" in row["sql"]:
+                conn.execute("COMMIT")
+                return
+            conn.execute(
+                """
+                CREATE TABLE batches_new (
+                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source       TEXT NOT NULL CHECK (source IN ('receipt', 'manual', 'photo')),
+                    created_at   TEXT NOT NULL,
+                    note         TEXT,
+                    receipt_id   INTEGER REFERENCES receipts(id) ON DELETE SET NULL
+                )
+                """
             )
-            """
-        )
-        conn.execute(
-            "INSERT INTO batches_new (id, source, created_at, note, receipt_id) "
-            "SELECT id, source, created_at, note, receipt_id FROM batches"
-        )
-        conn.execute("DROP TABLE batches")
-        conn.execute("ALTER TABLE batches_new RENAME TO batches")
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_batches_created_at ON batches(created_at DESC)"
-        )
-        conn.execute("COMMIT")
-    except Exception:
-        conn.execute("ROLLBACK")
-        raise
+            conn.execute(
+                "INSERT INTO batches_new (id, source, created_at, note, receipt_id) "
+                "SELECT id, source, created_at, note, receipt_id FROM batches"
+            )
+            conn.execute("DROP TABLE batches")
+            conn.execute("ALTER TABLE batches_new RENAME TO batches")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_batches_created_at ON batches(created_at DESC)"
+            )
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
     finally:
         conn.execute("PRAGMA foreign_keys=ON")
 

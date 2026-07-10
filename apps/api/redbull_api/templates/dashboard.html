@@ -72,6 +72,11 @@
     {% include "partials/log.html" %}
   </section>
 
+  <div class="img-modal" id="img-modal" role="dialog" aria-modal="true" aria-label="Scan image" aria-hidden="true">
+    <button class="img-modal-close" type="button" aria-label="Close">✕</button>
+    <img class="img-modal-img" id="img-modal-img" alt="Full scan image">
+  </div>
+
   <script>
   // ===== Manual-adjust dropdown: reveal custom input when "Other…" picked =====
   (function() {
@@ -121,13 +126,21 @@
           const wrap = document.createElement('div');
           wrap.innerHTML = await logResp.text();
           const fresh = wrap.firstElementChild;
-          if (fresh) document.getElementById('log').replaceWith(fresh);
+          if (fresh) {
+            document.getElementById('log').replaceWith(fresh);
+            // Manually-inserted HTML isn't wired by htmx; process it so the
+            // new rows' hx-delete buttons work without a full page reload.
+            if (window.htmx) htmx.process(fresh);
+          }
         }
         if (stockResp.ok) {
           const wrap = document.createElement('div');
           wrap.innerHTML = await stockResp.text();
           const fresh = wrap.firstElementChild;
-          if (fresh) document.getElementById('stock-card').replaceWith(fresh);
+          if (fresh) {
+            document.getElementById('stock-card').replaceWith(fresh);
+            if (window.htmx) htmx.process(fresh);
+          }
         }
       } catch (_) { /* ignore */ }
     }
@@ -168,6 +181,45 @@
 
     wire(camInput);
     wire(fileInput);
+  })();
+
+  // ===== Image lightbox: open scan thumbnails in a modal instead of a new tab =====
+  (function() {
+    const modal = document.getElementById('img-modal');
+    const modalImg = document.getElementById('img-modal-img');
+    if (!modal) return;
+    let lastFocus = null;
+
+    function open(src) {
+      lastFocus = document.activeElement;
+      modalImg.src = src;
+      modal.classList.add('is-open');
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('modal-open');
+      modal.querySelector('.img-modal-close').focus();
+    }
+    function close() {
+      modal.classList.remove('is-open');
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('modal-open');
+      modalImg.src = '';
+      if (lastFocus) { lastFocus.focus(); lastFocus = null; }
+    }
+
+    // Delegated so it keeps working after htmx re-renders the log.
+    document.addEventListener('click', (e) => {
+      const thumb = e.target.closest('.log-thumb[data-lightbox]');
+      if (thumb) {
+        e.preventDefault();
+        open(thumb.getAttribute('href'));
+        return;
+      }
+      // Click on the backdrop or the close button dismisses.
+      if (e.target === modal || e.target.closest('.img-modal-close')) close();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modal.classList.contains('is-open')) close();
+    });
   })();
   </script>
 {% endblock %}

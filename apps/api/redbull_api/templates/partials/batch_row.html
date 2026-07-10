@@ -2,8 +2,9 @@
 {% set receipt = batch["receipt"] %}
 <li class="log-row log-row--{{ batch.source }}" id="batch-{{ batch.id }}">
   {% if receipt %}
-    <a class="log-thumb" href="/api/v1/receipts/{{ receipt.id }}/image" target="_blank" rel="noopener">
-      <img src="/api/v1/receipts/{{ receipt.id }}/thumb" alt="receipt thumbnail" loading="lazy">
+    <a class="log-thumb log-thumb--zoom" href="/api/v1/receipts/{{ receipt.id }}/image"
+       data-lightbox aria-label="View full image">
+      <img src="/api/v1/receipts/{{ receipt.id }}/thumb" alt="scan thumbnail" loading="lazy">
     </a>
   {% else %}
     <div class="log-thumb log-thumb--placeholder" aria-hidden="true">
