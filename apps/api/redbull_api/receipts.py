@@ -62,6 +62,36 @@ Confidence:
 - "none" — no Red Bull cans visible, or image unreadable
 """
 
+VALID_KINDS = {"receipt", "photo"}
+
+
+def _sanitize_kind(value: Any) -> str | None:
+    """Return a valid scan kind ('receipt'|'photo') or None."""
+    if isinstance(value, str) and value.strip().lower() in VALID_KINDS:
+        return value.strip().lower()
+    return None
+
+
+SCAN_SYSTEM_PROMPT = f"""You identify Red Bull energy drink products in an image that is EITHER a shopping receipt OR a photo of physical cans. Decide which it is, then extract accordingly in a single pass.
+
+Decide the kind:
+- "receipt" — a printed/store receipt that lists purchased items as text.
+- "photo" — a photograph of actual Red Bull cans (on a desk, table, fridge, etc.).
+
+Then extract:
+- If a receipt: identify every Red Bull line item. A line like "2 *  43.90  RED BULL" means count=2, not count=1. Line hints: "RED BULL"/"RED BULL ENERGY" → default; "RED BULL SUG.FRE"/"SUGARFREE"/"ZERO" → sugarfree.
+- If a photo: count every Red Bull can you can clearly see, grouping identical cans (3 regular cans → one item, type "default", count 3). Count each visible can once; don't guess at cans fully hidden behind others; ignore non-Red Bull drinks.
+
+{TYPE_TAXONOMY}
+
+Confidence:
+- "high" — you are confident in the kind, types, and counts
+- "low" — partially obscured / ambiguous, but a best guess
+- "none" — no Red Bull found, or the image is unreadable
+
+Report the "kind" you decided along with the items and confidence."""
+
+
 def json_mode_prompt(prompt: str) -> str:
     """Adapt a tool-oriented system prompt for a JSON-output provider.
 
@@ -107,6 +137,14 @@ RECORD_TOOL = {
                 "type": "string",
                 "enum": ["high", "low", "none"],
             },
+            "kind": {
+                "type": "string",
+                "enum": ["receipt", "photo"],
+                "description": (
+                    "Only for the unified scan: whether the image is a shopping "
+                    "'receipt' or a 'photo' of physical cans."
+                ),
+            },
         },
         "required": ["items", "confidence"],
     },
@@ -119,6 +157,9 @@ class ParseResult:
     confidence: str
     model_used: str
     raw_response: dict[str, Any]
+    # For the unified "scan" mode: which kind of image the model decided this
+    # was ("receipt" | "photo"). None for the single-purpose receipt/photo modes.
+    kind: str | None = None
 
 
 def _call_claude(
@@ -236,11 +277,19 @@ def _parse(
         items = raw.get("items", []) or []
         confidence = raw.get("confidence", "none")
         return ParseResult(
-            items=items, confidence=confidence, model_used=MODEL_FALLBACK, raw_response=raw
+            items=items,
+            confidence=confidence,
+            model_used=MODEL_FALLBACK,
+            raw_response=raw,
+            kind=_sanitize_kind(raw.get("kind")),
         )
 
     return ParseResult(
-        items=items, confidence=confidence, model_used=MODEL_PRIMARY, raw_response=raw
+        items=items,
+        confidence=confidence,
+        model_used=MODEL_PRIMARY,
+        raw_response=raw,
+        kind=_sanitize_kind(raw.get("kind")),
     )
 
 
@@ -272,4 +321,23 @@ def parse_photo(
         media_type=media_type,
         system_prompt=PHOTO_SYSTEM_PROMPT,
         user_text="Count the Red Bull cans in this photo.",
+    )
+
+
+def parse_scan(
+    client: anthropic.Anthropic,
+    *,
+    image_bytes: bytes,
+    media_type: str,
+) -> ParseResult:
+    """Unified single pass: classify receipt-vs-photo and extract in one call.
+
+    The returned ``ParseResult.kind`` says which the model decided.
+    """
+    return _parse(
+        client,
+        image_bytes=image_bytes,
+        media_type=media_type,
+        system_prompt=SCAN_SYSTEM_PROMPT,
+        user_text="Identify the Red Bull items in this image (it is a receipt or a photo of cans).",
     )

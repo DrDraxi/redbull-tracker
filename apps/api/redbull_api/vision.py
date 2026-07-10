@@ -18,11 +18,13 @@ import logging
 from .codex_vision import CodexError, parse_via_codex
 from .config import Config
 from .openai_vision import OpenAIVisionError, parse_via_openai
-from .receipts import ParseResult, parse_photo, parse_receipt
+from .receipts import ParseResult, parse_photo, parse_receipt, parse_scan
 
 log = logging.getLogger(__name__)
 
-VALID_MODES = {"receipt", "photo"}
+# "scan" is the unified single-pass mode: the model self-classifies the image as
+# a receipt or a can photo and extracts accordingly (result.kind says which).
+VALID_MODES = {"receipt", "photo", "scan"}
 
 # Failures from the subscription-backed providers that are safe to retry on a
 # different backend (network/CLI/parse errors), as opposed to programmer errors.
@@ -77,6 +79,8 @@ def _dispatch(
         client = anthropic.Anthropic(api_key=cfg.anthropic_api_key)
         if mode == "receipt":
             return parse_receipt(client, image_bytes=image_bytes, media_type=media_type)
+        if mode == "scan":
+            return parse_scan(client, image_bytes=image_bytes, media_type=media_type)
         return parse_photo(client, image_bytes=image_bytes, media_type=media_type)
 
     if provider == "openai":
