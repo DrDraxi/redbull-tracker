@@ -27,7 +27,15 @@ import tempfile
 from pathlib import Path
 from typing import Any, Callable
 
-from .receipts import PHOTO_SYSTEM_PROMPT, SYSTEM_PROMPT, ParseResult, json_mode_prompt, shrink_image
+from .receipts import (
+    PHOTO_SYSTEM_PROMPT,
+    SCAN_SYSTEM_PROMPT,
+    SYSTEM_PROMPT,
+    ParseResult,
+    _sanitize_kind,
+    json_mode_prompt,
+    shrink_image,
+)
 
 # Codex can spin up its own reasoning; give it generous headroom but bound it so
 # a hung CLI can't wedge a request forever.
@@ -39,7 +47,8 @@ _JSON_CONTRACT = (
     'Respond with ONLY a single JSON object and nothing else — no markdown, no '
     'code fences, no explanation. Use exactly this shape:\n'
     '{"items": [{"type": "<lowercase keyword>", "count": <integer >= 1>}], '
-    '"confidence": "high" | "low" | "none"}\n'
+    '"confidence": "high" | "low" | "none", "kind": "receipt" | "photo"}\n'
+    '("kind" is which sort of image this is.) '
     'If there are no Red Bull products, return {"items": [], "confidence": "none"}.'
 )
 
@@ -56,12 +65,13 @@ class CodexError(RuntimeError):
 
 
 def _build_prompt(mode: str) -> str:
-    base = json_mode_prompt(PHOTO_SYSTEM_PROMPT if mode == "photo" else SYSTEM_PROMPT)
-    task = (
-        "Count the Red Bull cans visible in the attached photo."
-        if mode == "photo"
-        else "Parse the attached receipt image for Red Bull purchases."
+    base = json_mode_prompt(
+        {"photo": PHOTO_SYSTEM_PROMPT, "scan": SCAN_SYSTEM_PROMPT}.get(mode, SYSTEM_PROMPT)
     )
+    task = {
+        "photo": "Count the Red Bull cans visible in the attached photo.",
+        "scan": "Identify the Red Bull items in the attached image (a receipt or a photo of cans).",
+    }.get(mode, "Parse the attached receipt image for Red Bull purchases.")
     return f"{base}\n\n{task}\n\n{_JSON_CONTRACT}"
 
 
@@ -219,4 +229,5 @@ def parse_via_codex(
         confidence=confidence,
         model_used=f"codex:{model or 'default'}",
         raw_response=data,
+        kind=_sanitize_kind(data.get("kind")),
     )

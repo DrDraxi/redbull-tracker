@@ -1,4 +1,4 @@
-"""Tests for the smart /api/v1/scan endpoint (receipt-first, photo fallback)."""
+"""Tests for the unified single-pass /api/v1/scan endpoint."""
 
 import io
 from pathlib import Path
@@ -32,12 +32,13 @@ def client(tmp_path: Path, monkeypatch):
 HEADERS = {"Authorization": "Bearer tok"}
 
 
-def _result(items, confidence, model="openai:gpt-5.6-terra"):
+def _result(items, confidence, kind, model="openai:gpt-5.6-terra"):
     return ParseResult(
         items=items,
         confidence=confidence,
         model_used=model,
-        raw_response={"items": items, "confidence": confidence},
+        raw_response={"items": items, "confidence": confidence, "kind": kind},
+        kind=kind,
     )
 
 
@@ -50,39 +51,41 @@ def _post(client):
     )
 
 
-def test_receipt_wins_when_it_finds_items(client):
-    def fake(cfg, *, image_bytes, media_type, mode):
-        assert mode == "receipt"  # should never reach photo mode
-        return _result([{"type": "sugarfree", "count": 4}], "high")
-
-    with patch("redbull_api.routes.api.recognize", side_effect=fake) as mock:
-        r = _post(client)
-    assert r.status_code == 200
-    assert r.json["source"] == "receipt"
-    assert r.json["stock"]["by_type"] == {"sugarfree": 4}
-    assert mock.call_count == 1  # no photo fallback needed
-
-
-def test_falls_back_to_photo_when_receipt_empty(client):
-    def fake(cfg, *, image_bytes, media_type, mode):
-        if mode == "receipt":
-            return _result([], "none")
-        return _result([{"type": "summer", "count": 1}, {"type": "sugarfree", "count": 3}], "high")
-
-    with patch("redbull_api.routes.api.recognize", side_effect=fake) as mock:
+def test_single_call_photo_kind(client):
+    result = _result([{"type": "summer", "count": 1}, {"type": "sugarfree", "count": 3}], "high", "photo")
+    with patch("redbull_api.routes.api.recognize", return_value=result) as mock:
         r = _post(client)
     assert r.status_code == 200
     assert r.json["source"] == "photo"
     assert r.json["stock"]["by_type"] == {"summer": 1, "sugarfree": 3}
-    assert mock.call_count == 2
+    # Exactly one unified vision call, in scan mode.
+    assert mock.call_count == 1
+    assert mock.call_args.kwargs["mode"] == "scan"
 
     log = client.get("/api/v1/batches", headers=HEADERS).json
     entry = next(b for b in log["batches"] if b["id"] == r.json["batch_id"])
     assert entry["source"] == "photo"
 
 
-def test_422_when_neither_mode_finds_anything(client):
-    with patch("redbull_api.routes.api.recognize", side_effect=lambda *a, **k: _result([], "none")):
+def test_single_call_receipt_kind(client):
+    result = _result([{"type": "default", "count": 2}], "high", "receipt")
+    with patch("redbull_api.routes.api.recognize", return_value=result) as mock:
+        r = _post(client)
+    assert r.status_code == 200
+    assert r.json["source"] == "receipt"
+    assert mock.call_count == 1
+
+
+def test_kind_missing_defaults_to_photo(client):
+    result = _result([{"type": "default", "count": 1}], "high", None)
+    with patch("redbull_api.routes.api.recognize", return_value=result):
+        r = _post(client)
+    assert r.status_code == 200
+    assert r.json["source"] == "photo"
+
+
+def test_422_when_nothing_found(client):
+    with patch("redbull_api.routes.api.recognize", return_value=_result([], "none", None)):
         r = _post(client)
     assert r.status_code == 422
     assert r.json["error"] == "no_redbulls_found"

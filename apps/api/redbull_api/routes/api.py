@@ -140,24 +140,20 @@ def upload_receipt():
 
 @bp.post("/scan")
 def smart_scan():
-    """One-shot scan: try receipt mode, and if it finds no Red Bull line items,
-    re-run the image as a can photo. Records a single batch tagged with whichever
-    mode actually resolved cans."""
+    """One-shot smart scan: a single unified vision call classifies the image as
+    a receipt or a photo of cans and extracts accordingly. Records one batch
+    tagged with the detected source (defaults to 'photo' if unclassified)."""
     loaded, err = _load_scan_input()
     if err:
         return err
     data, media_type, cfg, saved = loaded
 
     try:
-        result = recognize(cfg, image_bytes=data, media_type=media_type, mode="receipt")
-        source = "receipt"
-        if not result.items:
-            photo = recognize(cfg, image_bytes=data, media_type=media_type, mode="photo")
-            if photo.items:
-                result, source = photo, "photo"
+        result = recognize(cfg, image_bytes=data, media_type=media_type, mode="scan")
     except (CodexError, OpenAIVisionError, anthropic.APIError) as e:
         return jsonify({"error": "vision_error", "detail": str(e)[:300]}), 502
 
+    source = result.kind if result.kind in ("receipt", "photo") else "photo"
     return _persist_scan(saved, result, source)
 
 

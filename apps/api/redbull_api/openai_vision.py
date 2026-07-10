@@ -21,13 +21,21 @@ import base64
 from typing import Any, Callable
 
 from .codex_vision import _extract_json, _sanitize_items
-from .receipts import PHOTO_SYSTEM_PROMPT, SYSTEM_PROMPT, ParseResult, json_mode_prompt, shrink_image
+from .receipts import (
+    PHOTO_SYSTEM_PROMPT,
+    SCAN_SYSTEM_PROMPT,
+    SYSTEM_PROMPT,
+    ParseResult,
+    _sanitize_kind,
+    json_mode_prompt,
+    shrink_image,
+)
 
 _JSON_CONTRACT = (
     'Return ONLY a JSON object of the form '
     '{"items": [{"type": "<lowercase keyword>", "count": <integer >= 1>}], '
-    '"confidence": "high" | "low" | "none"}. '
-    'No prose, no code fences.'
+    '"confidence": "high" | "low" | "none", "kind": "receipt" | "photo"}. '
+    '"kind" is which sort of image this is. No prose, no code fences.'
 )
 
 
@@ -36,7 +44,10 @@ class OpenAIVisionError(RuntimeError):
 
 
 def _system_prompt(mode: str) -> str:
-    base = PHOTO_SYSTEM_PROMPT if mode == "photo" else SYSTEM_PROMPT
+    base = {
+        "photo": PHOTO_SYSTEM_PROMPT,
+        "scan": SCAN_SYSTEM_PROMPT,
+    }.get(mode, SYSTEM_PROMPT)
     return json_mode_prompt(base)
 
 
@@ -57,11 +68,10 @@ def parse_via_openai(
     """
     image_bytes, media_type = shrink_image(image_bytes, media_type)
     data_uri = f"data:{media_type};base64," + base64.standard_b64encode(image_bytes).decode("ascii")
-    task = (
-        "Count the Red Bull cans visible in this photo."
-        if mode == "photo"
-        else "Parse this receipt for Red Bull purchases."
-    )
+    task = {
+        "photo": "Count the Red Bull cans visible in this photo.",
+        "scan": "Identify the Red Bull items in this image (a receipt or a photo of cans).",
+    }.get(mode, "Parse this receipt for Red Bull purchases.")
     messages = [
         {"role": "system", "content": _system_prompt(mode) + "\n\n" + _JSON_CONTRACT},
         {
@@ -92,6 +102,7 @@ def parse_via_openai(
         confidence=confidence,
         model_used=f"openai:{model}",
         raw_response=data,
+        kind=_sanitize_kind(data.get("kind")),
     )
 
 
