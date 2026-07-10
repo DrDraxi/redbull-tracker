@@ -168,19 +168,36 @@ def _call_claude(
     return {"items": [], "confidence": "none"}
 
 
-def _shrink_for_claude(image_bytes: bytes, media_type: str) -> tuple[bytes, str]:
-    if len(image_bytes) <= _MAX_RAW_BYTES:
+def shrink_image(
+    image_bytes: bytes,
+    media_type: str,
+    *,
+    max_bytes: int = _MAX_RAW_BYTES,
+    max_dim: int = 2000,
+) -> tuple[bytes, str]:
+    """Downscale/recompress an image if it exceeds ``max_bytes``.
+
+    Real phone photos are 4–5 MB, which is wasteful for can/receipt recognition
+    and can exceed vision-API/proxy payload limits. Bounding both dimension and
+    byte size keeps every provider (Anthropic, and the JSON providers that send
+    the image inline as a data URI) within limits. No-op for small images.
+    """
+    if len(image_bytes) <= max_bytes:
         return image_bytes, media_type
 
     with Image.open(io.BytesIO(image_bytes)) as img:
         rgb = img.convert("RGB")
-        rgb.thumbnail((2000, 2000))
+        rgb.thumbnail((max_dim, max_dim))
         for quality in (85, 75, 65, 55):
             buf = io.BytesIO()
             rgb.save(buf, "JPEG", quality=quality, optimize=True)
-            if buf.tell() <= _MAX_RAW_BYTES:
+            if buf.tell() <= max_bytes:
                 return buf.getvalue(), "image/jpeg"
         return buf.getvalue(), "image/jpeg"
+
+
+def _shrink_for_claude(image_bytes: bytes, media_type: str) -> tuple[bytes, str]:
+    return shrink_image(image_bytes, media_type)
 
 
 def _parse(

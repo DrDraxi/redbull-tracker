@@ -9,8 +9,8 @@
       <label class="scan-trigger">
         <input type="file" accept="image/*" capture="environment" id="scan-camera-input" hidden>
         <span class="upload-icon" aria-hidden="true">📷</span>
-        <span class="upload-title">SCAN RECEIPT</span>
-        <span class="upload-hint">Tap to open camera</span>
+        <span class="upload-title">SCAN</span>
+        <span class="upload-hint">Receipt or cans — tap to open camera</span>
       </label>
       <div class="scan-divider"><span>OR</span></div>
       <label class="scan-file">
@@ -134,21 +134,25 @@
 
     async function uploadFile(file) {
       const fd = new FormData();
-      fd.append('image', file, file.name || 'receipt.jpg');
+      fd.append('image', file, file.name || 'scan.jpg');
       scanCard.classList.add('is-loading');
       try {
-        const resp = await fetch('/api/v1/receipts', {
+        // Smart scan: the server tries receipt mode, then falls back to
+        // counting cans in a photo, so one button handles both.
+        const resp = await fetch('/api/v1/scan', {
           method: 'POST',
           body: fd,
           credentials: 'same-origin',
         });
         await refreshFragments();
-        if (!resp.ok && resp.status !== 422) {
+        if (resp.status === 422) {
+          alert('No Red Bull receipt items or cans found in that image.');
+        } else if (!resp.ok) {
           const text = await resp.text();
-          alert(`Upload failed (${resp.status}): ${text.slice(0, 200)}`);
+          alert(`Scan failed (${resp.status}): ${text.slice(0, 200)}`);
         }
       } catch (err) {
-        alert(`Upload failed: ${err.message || err}`);
+        alert(`Scan failed: ${err.message || err}`);
       } finally {
         scanCard.classList.remove('is-loading');
       }

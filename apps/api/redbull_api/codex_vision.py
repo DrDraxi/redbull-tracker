@@ -27,7 +27,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Callable
 
-from .receipts import PHOTO_SYSTEM_PROMPT, SYSTEM_PROMPT, ParseResult, json_mode_prompt
+from .receipts import PHOTO_SYSTEM_PROMPT, SYSTEM_PROMPT, ParseResult, json_mode_prompt, shrink_image
 
 # Codex can spin up its own reasoning; give it generous headroom but bound it so
 # a hung CLI can't wedge a request forever.
@@ -172,6 +172,7 @@ def parse_via_codex(
     ``mode`` is ``"receipt"`` or ``"photo"``. ``runner`` is injectable for tests.
     """
     run = runner or _run_codex
+    image_bytes, media_type = shrink_image(image_bytes, media_type)
     ext = _EXT_BY_MEDIA.get(media_type, "jpg")
 
     with tempfile.TemporaryDirectory(prefix="rb-codex-") as td:

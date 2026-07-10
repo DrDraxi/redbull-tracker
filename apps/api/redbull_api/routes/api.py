@@ -63,40 +63,29 @@ def delete(batch_id: int):
     return jsonify({"stock": get_stock(g.db)})
 
 
-def _scan_and_record(*, mode: str, source: str):
-    """Shared handler: save the image, run vision recognition, record a batch.
-
-    Used by both the receipt endpoint (mode="receipt") and the plain-photo
-    endpoint (mode="photo"). The recognized image is stored in the `receipts`
-    table (which is really a scan record) so it can be served/thumbnailed the
-    same way regardless of source.
-    """
+def _load_scan_input():
+    """Read + persist the uploaded image. Returns ((data, media_type, cfg, saved), None)
+    on success, or (None, error_response) to return directly."""
     file = request.files.get("image")
     if not file:
-        return jsonify({"error": "missing_image"}), 400
+        return None, (jsonify({"error": "missing_image"}), 400)
 
     data = file.read()
     if not data:
-        return jsonify({"error": "missing_image"}), 400
+        return None, (jsonify({"error": "missing_image"}), 400)
 
     cfg = current_app.config["CONFIG"]
+    media_type = file.mimetype or "image/jpeg"
     try:
-        saved = save_image_and_thumbnail(
-            data, content_type=file.mimetype or "image/jpeg", data_dir=cfg.data_dir
-        )
+        saved = save_image_and_thumbnail(data, content_type=media_type, data_dir=cfg.data_dir)
     except ValueError:
-        return jsonify({"error": "invalid_image"}), 400
+        return None, (jsonify({"error": "invalid_image"}), 400)
 
-    try:
-        result = recognize(
-            cfg, image_bytes=data, media_type=file.mimetype or "image/jpeg", mode=mode
-        )
-    except (CodexError, OpenAIVisionError) as e:
-        return jsonify({"error": "vision_error", "detail": str(e)[:300]}), 502
-    except anthropic.APIError as e:
-        return jsonify({"error": "vision_error", "detail": str(e)[:300]}), 502
+    return (data, media_type, cfg, saved), None
 
-    # Insert scan row (reused `receipts` table)
+
+def _persist_scan(saved, result, source: str):
+    """Record one scan (receipts row) + one batch with the detected source."""
     cur = g.db.execute(
         "INSERT INTO receipts (filename, thumbnail, uploaded_at, model_used, raw_response, confidence) "
         "VALUES (?, ?, ?, ?, ?, ?)",
@@ -113,13 +102,12 @@ def _scan_and_record(*, mode: str, source: str):
 
     # Create the batch — even with zero items when confidence == "none"
     items = [(it["type"], it["count"]) for it in result.items]
-    batch_id = add_batch(
-        g.db, source=source, items=items, note=None, receipt_id=receipt_id
-    )
+    batch_id = add_batch(g.db, source=source, items=items, note=None, receipt_id=receipt_id)
 
     payload = {
         "batch_id": batch_id,
         "receipt_id": receipt_id,
+        "source": source,
         "items": result.items,
         "confidence": result.confidence,
         "stock": get_stock(g.db),
@@ -130,9 +118,47 @@ def _scan_and_record(*, mode: str, source: str):
     return jsonify(payload)
 
 
+def _scan_and_record(*, mode: str, source: str):
+    """Save the image, run a single recognition mode, record a batch."""
+    loaded, err = _load_scan_input()
+    if err:
+        return err
+    data, media_type, cfg, saved = loaded
+
+    try:
+        result = recognize(cfg, image_bytes=data, media_type=media_type, mode=mode)
+    except (CodexError, OpenAIVisionError, anthropic.APIError) as e:
+        return jsonify({"error": "vision_error", "detail": str(e)[:300]}), 502
+
+    return _persist_scan(saved, result, source)
+
+
 @bp.post("/receipts")
 def upload_receipt():
     return _scan_and_record(mode="receipt", source="receipt")
+
+
+@bp.post("/scan")
+def smart_scan():
+    """One-shot scan: try receipt mode, and if it finds no Red Bull line items,
+    re-run the image as a can photo. Records a single batch tagged with whichever
+    mode actually resolved cans."""
+    loaded, err = _load_scan_input()
+    if err:
+        return err
+    data, media_type, cfg, saved = loaded
+
+    try:
+        result = recognize(cfg, image_bytes=data, media_type=media_type, mode="receipt")
+        source = "receipt"
+        if not result.items:
+            photo = recognize(cfg, image_bytes=data, media_type=media_type, mode="photo")
+            if photo.items:
+                result, source = photo, "photo"
+    except (CodexError, OpenAIVisionError, anthropic.APIError) as e:
+        return jsonify({"error": "vision_error", "detail": str(e)[:300]}), 502
+
+    return _persist_scan(saved, result, source)
 
 
 @bp.post("/photos")
