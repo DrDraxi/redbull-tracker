@@ -85,9 +85,33 @@ All data stored in `%LOCALAPPDATA%\RedBullTracker\`:
 }
 ```
 
+### API Vision Recognition (receipts & photos)
+
+The API recognizes Red Bull cans in two kinds of images:
+
+- `POST /api/v1/receipts` — parse Red Bull line items on a shopping receipt.
+- `POST /api/v1/photos` — count Red Bull cans in an ordinary photo (e.g. cans
+  on a desk). Records a batch with `source='photo'`.
+
+Both dispatch through `redbull_api/vision.py:recognize(cfg, mode=...)`, which
+selects a backend via `VISION_PROVIDER`:
+
+| `VISION_PROVIDER` | Module | Auth | Notes |
+|---|---|---|---|
+| `codex` (default) | `codex_vision.py` | `codex login` (Codex/ChatGPT subscription) | Shells out to `codex exec "<prompt>" --image <file> --output-last-message <file> --sandbox read-only --skip-git-repo-check`. No metered API key. Requires the `codex` CLI installed + logged in on the host. |
+| `openai` | `openai_vision.py` | `OPENAI_API_KEY` | Calls an OpenAI-compatible `/v1/chat/completions`. Set `OPENAI_BASE_URL` to a local subscription proxy (e.g. EvanZhouDev/openai-oauth) to bill the subscription instead of the API. That proxy is documented for local use only — not for hosted deployment. |
+| `anthropic` | `receipts.py` | `ANTHROPIC_API_KEY` | Original Anthropic vision path (Haiku → Sonnet fallback). |
+
+Relevant env vars: `VISION_PROVIDER`, `CODEX_BIN`, `CODEX_MODEL`, `OPENAI_API_KEY`,
+`OPENAI_BASE_URL`, `OPENAI_MODEL`, `ANTHROPIC_API_KEY`.
+
 ## Gotchas
 
 - **Platform required**: Use `-p:Platform=x64` for all build commands.
+- **Codex vision provider**: needs the `codex` CLI on the API host and a
+  completed `codex login` (or `codex login --device-auth` on headless boxes,
+  which writes `~/.codex/auth.json`). `codex exec` requires the prompt *before*
+  its flags.
 - **Submodule**: Must initialize submodule before building.
 - **Assets**: Can images must exist in `Assets/` directory (`redbull-default.png`, `redbull-sugarfree.png`, `redbull-empty.png`).
 

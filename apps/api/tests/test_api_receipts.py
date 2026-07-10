@@ -39,7 +39,7 @@ def _fake_parse(items, confidence, model="claude-haiku-4-5"):
 
 
 def test_upload_high_confidence_creates_batch(client):
-    with patch("redbull_api.routes.api.parse_receipt") as mock_parse:
+    with patch("redbull_api.routes.api.recognize") as mock_parse:
         mock_parse.return_value = _fake_parse(
             [{"type": "sugarfree", "count": 2}], "high"
         )
@@ -57,7 +57,7 @@ def test_upload_high_confidence_creates_batch(client):
 
 
 def test_upload_none_confidence_still_creates_batch_returns_422(client):
-    with patch("redbull_api.routes.api.parse_receipt") as mock_parse:
+    with patch("redbull_api.routes.api.recognize") as mock_parse:
         mock_parse.return_value = _fake_parse([], "none")
         r = client.post(
             "/api/v1/receipts",
@@ -90,7 +90,7 @@ def test_upload_rejects_missing_file(client):
 
 
 def test_serve_thumbnail(client):
-    with patch("redbull_api.routes.api.parse_receipt") as mock_parse:
+    with patch("redbull_api.routes.api.recognize") as mock_parse:
         mock_parse.return_value = _fake_parse([{"type": "default", "count": 1}], "high")
         upload = client.post(
             "/api/v1/receipts",
@@ -105,7 +105,7 @@ def test_serve_thumbnail(client):
 
 
 def test_serve_full_image(client):
-    with patch("redbull_api.routes.api.parse_receipt") as mock_parse:
+    with patch("redbull_api.routes.api.recognize") as mock_parse:
         mock_parse.return_value = _fake_parse([{"type": "default", "count": 1}], "high")
         upload = client.post(
             "/api/v1/receipts",
