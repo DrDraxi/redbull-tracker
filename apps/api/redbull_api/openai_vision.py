@@ -21,7 +21,7 @@ import base64
 from typing import Any, Callable
 
 from .codex_vision import _extract_json, _sanitize_items
-from .receipts import PHOTO_SYSTEM_PROMPT, SYSTEM_PROMPT, ParseResult, json_mode_prompt
+from .receipts import PHOTO_SYSTEM_PROMPT, SYSTEM_PROMPT, ParseResult, json_mode_prompt, shrink_image
 
 _JSON_CONTRACT = (
     'Return ONLY a JSON object of the form '
@@ -55,6 +55,7 @@ def parse_via_openai(
     ``caller`` is injectable for tests; when omitted the real ``openai`` SDK is
     used (imported lazily so the dependency is only needed for this provider).
     """
+    image_bytes, media_type = shrink_image(image_bytes, media_type)
     data_uri = f"data:{media_type};base64," + base64.standard_b64encode(image_bytes).decode("ascii")
     task = (
         "Count the Red Bull cans visible in this photo."
