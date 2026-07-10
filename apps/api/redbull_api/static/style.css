@@ -693,6 +693,91 @@ main {
   color: var(--text-muted);
 }
 
+/* Clickable scan thumbnails open a lightbox — hint it on hover. */
+.log-thumb--zoom {
+  cursor: zoom-in;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.log-thumb--zoom:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 2px var(--rb-yellow), var(--shadow-glow);
+}
+.log-thumb--zoom img {
+  transition: transform 0.2s ease;
+}
+.log-thumb--zoom:hover img {
+  transform: scale(1.08);
+}
+
+/* ===== Image lightbox modal ===== */
+.img-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(1.25rem, env(safe-area-inset-top)) 1.25rem max(1.25rem, env(safe-area-inset-bottom));
+  background: rgba(0, 3, 20, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.18s ease, visibility 0.18s ease;
+}
+.img-modal.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+.img-modal-img {
+  max-width: min(94vw, 900px);
+  max-height: 88vh;
+  object-fit: contain;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
+  background: rgba(0, 0, 0, 0.4);
+  transform: scale(0.96);
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.img-modal.is-open .img-modal-img {
+  transform: scale(1);
+}
+.img-modal-close {
+  position: absolute;
+  top: max(0.9rem, env(safe-area-inset-top));
+  right: 1rem;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.img-modal-close:hover {
+  background: rgba(255, 255, 255, 0.16);
+  transform: scale(1.05);
+}
+body.modal-open {
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .img-modal,
+  .img-modal-img,
+  .log-thumb--zoom,
+  .log-thumb--zoom img {
+    transition: none;
+  }
+}
+
 .log-line-top {
   display: flex;
   gap: 0.6rem;
