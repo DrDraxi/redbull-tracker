@@ -1,6 +1,5 @@
 import time
 
-import pytest
 from itsdangerous import URLSafeTimedSerializer
 
 from redbull_api.auth import (

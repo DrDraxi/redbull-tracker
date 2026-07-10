@@ -9,10 +9,12 @@ from datetime import datetime, timezone
 import anthropic
 from flask import Blueprint, current_app, g, jsonify, request, send_from_directory
 
+from ..codex_vision import CodexError
 from ..images import save_image_and_thumbnail
+from ..openai_vision import OpenAIVisionError
 from ..prices import add_price, delete_price, list_prices, refresh_from_web
-from ..receipts import parse_receipt
 from ..stock import add_batch, delete_batch, get_stock, list_batches
+from ..vision import recognize
 
 bp = Blueprint("api", __name__, url_prefix="/api/v1")
 
@@ -61,8 +63,14 @@ def delete(batch_id: int):
     return jsonify({"stock": get_stock(g.db)})
 
 
-@bp.post("/receipts")
-def upload_receipt():
+def _scan_and_record(*, mode: str, source: str):
+    """Shared handler: save the image, run vision recognition, record a batch.
+
+    Used by both the receipt endpoint (mode="receipt") and the plain-photo
+    endpoint (mode="photo"). The recognized image is stored in the `receipts`
+    table (which is really a scan record) so it can be served/thumbnailed the
+    same way regardless of source.
+    """
     file = request.files.get("image")
     if not file:
         return jsonify({"error": "missing_image"}), 400
@@ -79,12 +87,16 @@ def upload_receipt():
     except ValueError:
         return jsonify({"error": "invalid_image"}), 400
 
-    client = anthropic.Anthropic(api_key=cfg.anthropic_api_key)
-    result = parse_receipt(
-        client, image_bytes=data, media_type=file.mimetype or "image/jpeg"
-    )
+    try:
+        result = recognize(
+            cfg, image_bytes=data, media_type=file.mimetype or "image/jpeg", mode=mode
+        )
+    except (CodexError, OpenAIVisionError) as e:
+        return jsonify({"error": "vision_error", "detail": str(e)[:300]}), 502
+    except anthropic.APIError as e:
+        return jsonify({"error": "vision_error", "detail": str(e)[:300]}), 502
 
-    # Insert receipt row
+    # Insert scan row (reused `receipts` table)
     cur = g.db.execute(
         "INSERT INTO receipts (filename, thumbnail, uploaded_at, model_used, raw_response, confidence) "
         "VALUES (?, ?, ?, ?, ?, ?)",
@@ -102,7 +114,7 @@ def upload_receipt():
     # Create the batch — even with zero items when confidence == "none"
     items = [(it["type"], it["count"]) for it in result.items]
     batch_id = add_batch(
-        g.db, source="receipt", items=items, note=None, receipt_id=receipt_id
+        g.db, source=source, items=items, note=None, receipt_id=receipt_id
     )
 
     payload = {
@@ -116,6 +128,17 @@ def upload_receipt():
         payload["error"] = "no_redbulls_found"
         return jsonify(payload), 422
     return jsonify(payload)
+
+
+@bp.post("/receipts")
+def upload_receipt():
+    return _scan_and_record(mode="receipt", source="receipt")
+
+
+@bp.post("/photos")
+def upload_photo():
+    """Recognize Red Bull cans in an ordinary photo (e.g. cans on a desk)."""
+    return _scan_and_record(mode="photo", source="photo")
 
 
 @bp.get("/receipts/<int:receipt_id>/image")

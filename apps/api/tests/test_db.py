@@ -1,4 +1,3 @@
-import sqlite3
 from pathlib import Path
 
 from redbull_api.db import connect, init_db

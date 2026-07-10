@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- API vision recognition can now run through an **OpenAI Codex subscription**
+  instead of a metered vision API. The new `codex` provider (the default) shells
+  out to the `codex exec` CLI, which reuses the auth from `codex login` — so
+  recognition is billed against your Codex/ChatGPT plan, not an API key. The
+  provider is selectable via `VISION_PROVIDER` (`codex` | `openai` | `anthropic`);
+  the `openai` provider targets any OpenAI-compatible endpoint (a real key, or a
+  local subscription proxy such as EvanZhouDev/openai-oauth via `OPENAI_BASE_URL`).
+- New **`POST /api/v1/photos`** endpoint recognizes Red Bull cans in ordinary
+  photos (e.g. cans on a desk), not just receipts, and records them as a batch
+  with source `photo`.
+- `AGENTS.md` so OpenAI Codex (and other agents that read `AGENTS.md`) get the
+  same project guidance as Claude Code's `CLAUDE.md`.
 - The web dashboard is now an installable Progressive Web App (PWA). A web
   manifest, app icons (including a maskable icon and Apple touch icon), and a
   service worker let you install Red Bull Tracker to your home screen or

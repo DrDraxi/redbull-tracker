@@ -5,10 +5,11 @@ CREATE TABLE IF NOT EXISTS stock (
     updated_at  TEXT NOT NULL
 );
 
--- Each batch is one action: a receipt scan or a manual +/- adjustment.
+-- Each batch is one action: a receipt scan, a photo scan, or a manual +/-
+-- adjustment.
 CREATE TABLE IF NOT EXISTS batches (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    source       TEXT NOT NULL CHECK (source IN ('receipt', 'manual')),
+    source       TEXT NOT NULL CHECK (source IN ('receipt', 'manual', 'photo')),
     created_at   TEXT NOT NULL,
     note         TEXT,
     receipt_id   INTEGER REFERENCES receipts(id) ON DELETE SET NULL

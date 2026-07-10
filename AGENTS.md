@@ -1,10 +1,23 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to OpenAI Codex and other AI coding agents when working with code in this repository. It mirrors the project knowledge in [`CLAUDE.md`](CLAUDE.md); keep the two in sync when either changes.
 
 ## Project Overview
 
 RedBull Tracker is a Windows taskbar widget that tracks Red Bull consumption. It displays cans visually in the taskbar, allowing quick add/remove with mouse clicks. Uses pure Win32 GDI rendering via the TaskbarWidget submodule. Supports offline mode with local persistence and configurable can types.
+
+## Setup
+
+After cloning, initialize the submodule before building:
+
+```bash
+git submodule update --init --recursive
+```
+
+Requirements:
+
+- Windows 10/11 (the widget is a Win32 GDI app)
+- .NET 8.0 SDK
 
 ## Build Commands
 
@@ -27,13 +40,8 @@ dotnet publish apps/widget/RedBullTracker.csproj --configuration Release --runti
 ### Solution Structure
 
 - **RedBullTracker** (`apps/widget/`) - Win32 GDI app with taskbar widget
-- **API** (`apps/api/`) - Flask + SQLite backend (planned; see docs/superpowers/specs/2026-05-18-api-monorepo-receipt-tracking-design.md)
+- **API** (`apps/api/`) - Flask + SQLite backend (planned; see `docs/superpowers/specs/2026-05-18-api-monorepo-receipt-tracking-design.md`)
 - **TaskbarWidget** (`lib/taskbar-widget/`) - Git submodule for immediate-mode GDI widget toolkit
-
-After cloning, initialize the submodule:
-```bash
-git submodule update --init --recursive
-```
 
 ### Key Components
 
@@ -55,6 +63,7 @@ apps/widget/
 ### Widget System
 
 RedBullWidget uses the `TaskbarWidget.Widget` API (immediate-mode Win32 GDI):
+
 1. Loads can images via `WidgetImage.FromFile()` from `Assets/` directory
 2. Creates `new Widget("RedBull", render: ctx => { ... })` with a render callback
 3. Render callback draws can images horizontally using `ctx.Panel()` and `h.DrawImage()`
@@ -71,6 +80,7 @@ RedBullWidget uses the `TaskbarWidget.Widget` API (immediate-mode Win32 GDI):
 ### Data Storage
 
 All data stored in `%LOCALAPPDATA%\RedBullTracker\`:
+
 - `config.json` - App configuration
 - `count.txt` - Current Red Bull count
 
@@ -94,33 +104,24 @@ The API recognizes Red Bull cans in two kinds of images:
   on a desk). Records a batch with `source='photo'`.
 
 Both dispatch through `redbull_api/vision.py:recognize(cfg, mode=...)`, which
-selects a backend via `VISION_PROVIDER`:
+selects a backend via the `VISION_PROVIDER` env var:
 
 | `VISION_PROVIDER` | Module | Auth | Notes |
 |---|---|---|---|
-| `codex` (default) | `codex_vision.py` | `codex login` (Codex/ChatGPT subscription) | Shells out to `codex exec "<prompt>" --image <file> --output-last-message <file> --sandbox read-only --skip-git-repo-check`. No metered API key. Requires the `codex` CLI installed + logged in on the host. |
-| `openai` | `openai_vision.py` | `OPENAI_API_KEY` | Calls an OpenAI-compatible `/v1/chat/completions`. Point `OPENAI_BASE_URL` at a subscription proxy to bill a ChatGPT/Codex subscription instead of a metered API. **Production uses the private `codex-proxy` service** (github.com/DrDraxi/codex-proxy) over Railway private networking: `OPENAI_BASE_URL=http://codex.railway.internal:8000/v1`, `OPENAI_API_KEY=dummy`, `OPENAI_MODEL=gpt-5.6-terra`. |
-| `anthropic` | `receipts.py` | `ANTHROPIC_API_KEY` | Anthropic vision path (Haiku → Sonnet fallback). Also serves as the automatic **fallback** for the `codex`/`openai` providers (see below). |
+| `codex` (default) | `codex_vision.py` | `codex login` (Codex/ChatGPT subscription) | Shells out to `codex exec "<prompt>" --image <file> --output-last-message <file> --sandbox read-only --skip-git-repo-check`. No metered API key; requires the `codex` CLI installed + logged in on the host. |
+| `openai` | `openai_vision.py` | `OPENAI_API_KEY` | Calls an OpenAI-compatible `/v1/chat/completions`. Point `OPENAI_BASE_URL` at a subscription proxy to bill a ChatGPT/Codex subscription instead of a metered API. **Production uses the private `codex-proxy` service** over Railway private networking: `OPENAI_BASE_URL=http://codex.railway.internal:8000/v1`, `OPENAI_API_KEY=dummy`, `OPENAI_MODEL=gpt-5.6-terra`. |
+| `anthropic` | `receipts.py` | `ANTHROPIC_API_KEY` | Anthropic vision path (Haiku → Sonnet). Also the automatic **fallback** for the `codex`/`openai` providers when their call fails and `ANTHROPIC_API_KEY` is set. |
 
 Relevant env vars: `VISION_PROVIDER`, `CODEX_BIN`, `CODEX_MODEL`, `OPENAI_API_KEY`,
-`OPENAI_BASE_URL`, `OPENAI_MODEL`, `ANTHROPIC_API_KEY`.
-
-**Fallback:** if the configured provider is not `anthropic` and its call fails
-(`CodexError`/`OpenAIVisionError`) while `ANTHROPIC_API_KEY` is set, `recognize()`
-retries once via Anthropic so a proxy/CLI hiccup doesn't hard-fail detection.
-The endpoint only returns `502` if the fallback also fails (or none is configured).
-
-**Model note:** the proxy passes model slugs through verbatim unless remapped, so
-`gpt-5.6-terra` (vision-capable, balanced) reaches the Codex backend as-is.
+`OPENAI_BASE_URL`, `OPENAI_MODEL`, `ANTHROPIC_API_KEY`. `codex exec` requires the
+prompt *before* its flags, and reuses the auth from `codex login` (use
+`codex login --device-auth` on headless hosts). The proxy passes model slugs
+through verbatim unless remapped, so `gpt-5.6-terra` reaches the Codex backend as-is.
 
 ## Gotchas
 
 - **Platform required**: Use `-p:Platform=x64` for all build commands.
-- **Codex vision provider**: needs the `codex` CLI on the API host and a
-  completed `codex login` (or `codex login --device-auth` on headless boxes,
-  which writes `~/.codex/auth.json`). `codex exec` requires the prompt *before*
-  its flags.
-- **Submodule**: Must initialize submodule before building.
+- **Submodule**: Must initialize the submodule before building.
 - **Assets**: Can images must exist in `Assets/` directory (`redbull-default.png`, `redbull-sugarfree.png`, `redbull-empty.png`).
 
 ## Releases
@@ -130,6 +131,7 @@ Version is derived from git tags. The GitHub Actions workflow automatically crea
 ### How to Release
 
 1. **Update CHANGELOG.md** with the new version section:
+
    ```markdown
    ## [v1.1.0] - YYYY-MM-DD
 
@@ -144,6 +146,7 @@ Version is derived from git tags. The GitHub Actions workflow automatically crea
    ```
 
 2. **Commit the changelog**:
+
    ```bash
    git add CHANGELOG.md
    git commit -m "docs: update changelog for v1.1.0"
@@ -151,19 +154,18 @@ Version is derived from git tags. The GitHub Actions workflow automatically crea
    ```
 
 3. **Create and push the tag**:
+
    ```bash
    git tag v1.1.0
    git push origin v1.1.0
    ```
 
-4. The workflow will automatically:
-   - Build the exe and zip artifacts
-   - Extract release notes from CHANGELOG.md for this version
-   - Create a GitHub release with the artifacts and notes
+4. The workflow will automatically build artifacts, extract release notes from CHANGELOG.md, and create a GitHub release.
 
 ### Changelog Format
 
 Follow [Keep a Changelog](https://keepachangelog.com/) format:
+
 - `### Added` - New features
 - `### Changed` - Changes in existing functionality
 - `### Deprecated` - Soon-to-be removed features
@@ -174,23 +176,17 @@ Follow [Keep a Changelog](https://keepachangelog.com/) format:
 ### Version Numbering
 
 Follow [Semantic Versioning](https://semver.org/):
+
 - **Major** (v2.0.0): Breaking changes
 - **Minor** (v1.1.0): New features, backwards compatible
 - **Patch** (v1.0.1): Bug fixes, backwards compatible
 
 ## CI/CD
 
-### Workflows
-
-- **CI** (`.github/workflows/ci-widget.yml`): Runs on widget-related changes (pushes to main, all PRs)
-  - Builds debug and release
-  - Uploads portable exe artifact
-
-- **Release** (`.github/workflows/release.yml`): Runs on version tags
-  - Builds single-file exe and zip
-  - Extracts changelog notes
-  - Creates GitHub release with artifacts
+- **CI** (`.github/workflows/ci-widget.yml`): Runs on widget-related changes (pushes to main, all PRs). Builds debug and release, uploads portable exe artifact.
+- **Release** (`.github/workflows/release.yml`): Runs on version tags. Builds single-file exe and zip, extracts changelog notes, creates GitHub release with artifacts.
 
 ## Commit Guidelines
 
-Do not add `Co-Authored-By: Claude` or similar co-author lines to commits.
+- Do not add co-author trailers (e.g. `Co-Authored-By: ...`) to commits.
+- Use clear, descriptive commit messages. Conventional-commit prefixes (`feat:`, `fix:`, `docs:`, etc.) are used throughout the history.

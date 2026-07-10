@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import io
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -17,16 +18,23 @@ _MAX_RAW_BYTES = 3_500_000
 MODEL_PRIMARY = "claude-haiku-4-5"
 MODEL_FALLBACK = "claude-sonnet-4-6"
 
-SYSTEM_PROMPT = """You are a receipt parser specialized in identifying Red Bull energy drink purchases.
+# Shared Red Bull variant taxonomy — used by both the receipt and photo prompts.
+TYPE_TAXONOMY = """Type identification:
+- "default" — regular Red Bull (red/silver/blue can, red bull logo)
+- "sugarfree" — sugar-free / zero variants
+- "tropical", "watermelon", "peach", "coconut", "summer" — Edition / Summer Edition flavors
+- For any other flavor variant, use a short lowercase English keyword"""
+
+SYSTEM_PROMPT = f"""You are a receipt parser specialized in identifying Red Bull energy drink purchases.
 
 Given an image of a receipt, identify every line item that is a Red Bull product
 and call the record_redbulls tool with the results.
 
-Type identification:
-- "default" — regular Red Bull (red can). Receipt lines: "RED BULL", "RED BULL ENERGY"
-- "sugarfree" — sugar-free / zero variants. Receipt lines: "RED BULL SUG.FRE", "SUGARFREE", "ZERO"
-- "tropical", "watermelon", "peach", "coconut", "summer" — Edition / Summer Edition flavors
-- For any other flavor variant, use a short lowercase English keyword
+{TYPE_TAXONOMY}
+
+Receipt line hints:
+- "RED BULL", "RED BULL ENERGY" → default
+- "RED BULL SUG.FRE", "SUGARFREE", "ZERO" → sugarfree
 
 Multi-pack handling: a line like "2 *  43.90  RED BULL" means count=2, not count=1.
 
@@ -35,6 +43,40 @@ Confidence:
 - "low" — text is partially obscured / OCR-ambiguous but you made a best guess
 - "none" — no Red Bull on this receipt, or image unreadable
 """
+
+PHOTO_SYSTEM_PROMPT = f"""You are a vision assistant that counts Red Bull energy drink cans in ordinary photographs.
+
+Given a photo (for example cans sitting on a desk, a table, or in a fridge), count
+every Red Bull can you can clearly see and call the record_redbulls tool with the
+per-type totals. Only count cans you are confident are Red Bull; ignore other drinks.
+
+{TYPE_TAXONOMY}
+
+Counting rules:
+- Group identical cans: 3 regular cans → one item with type "default", count 3.
+- Count each visible can once. Do not guess at cans fully hidden behind others.
+
+Confidence:
+- "high" — cans are clearly visible and you are confident in types and counts
+- "low" — some cans are blurry / partially hidden but you made a best guess
+- "none" — no Red Bull cans visible, or image unreadable
+"""
+
+def json_mode_prompt(prompt: str) -> str:
+    """Adapt a tool-oriented system prompt for a JSON-output provider.
+
+    ``SYSTEM_PROMPT`` / ``PHOTO_SYSTEM_PROMPT`` tell the model to "call the
+    record_redbulls tool" — correct for the Anthropic tool-use path, but noise
+    for the ``codex``/``openai`` providers, which instead ask for a raw JSON
+    object. Strip the tool instruction so those providers get one coherent
+    directive. A no-op if the phrase isn't present.
+    """
+    return re.sub(
+        r"\s*and call the record_redbulls tool with[^.]*",
+        " and report them",
+        prompt,
+    )
+
 
 RECORD_TOOL = {
     "name": "record_redbulls",
@@ -85,6 +127,8 @@ def _call_claude(
     model: str,
     image_b64: str,
     media_type: str,
+    system_prompt: str = SYSTEM_PROMPT,
+    user_text: str = "Parse this receipt.",
 ) -> dict[str, Any]:
     resp = client.messages.create(
         model=model,
@@ -92,7 +136,7 @@ def _call_claude(
         system=[
             {
                 "type": "text",
-                "text": SYSTEM_PROMPT,
+                "text": system_prompt,
                 "cache_control": {"type": "ephemeral"},
             }
         ],
@@ -113,7 +157,7 @@ def _call_claude(
                             "data": image_b64,
                         },
                     },
-                    {"type": "text", "text": "Parse this receipt."},
+                    {"type": "text", "text": user_text},
                 ],
             }
         ],
@@ -139,23 +183,39 @@ def _shrink_for_claude(image_bytes: bytes, media_type: str) -> tuple[bytes, str]
         return buf.getvalue(), "image/jpeg"
 
 
-def parse_receipt(
+def _parse(
     client: anthropic.Anthropic,
     *,
     image_bytes: bytes,
     media_type: str,
+    system_prompt: str,
+    user_text: str,
 ) -> ParseResult:
     image_bytes, media_type = _shrink_for_claude(image_bytes, media_type)
     image_b64 = base64.standard_b64encode(image_bytes).decode("ascii")
 
     # Primary call
-    raw = _call_claude(client, model=MODEL_PRIMARY, image_b64=image_b64, media_type=media_type)
+    raw = _call_claude(
+        client,
+        model=MODEL_PRIMARY,
+        image_b64=image_b64,
+        media_type=media_type,
+        system_prompt=system_prompt,
+        user_text=user_text,
+    )
     items = raw.get("items", []) or []
     confidence = raw.get("confidence", "none")
 
     if confidence == "low":
         # Retry with Sonnet
-        raw = _call_claude(client, model=MODEL_FALLBACK, image_b64=image_b64, media_type=media_type)
+        raw = _call_claude(
+            client,
+            model=MODEL_FALLBACK,
+            image_b64=image_b64,
+            media_type=media_type,
+            system_prompt=system_prompt,
+            user_text=user_text,
+        )
         items = raw.get("items", []) or []
         confidence = raw.get("confidence", "none")
         return ParseResult(
@@ -164,4 +224,35 @@ def parse_receipt(
 
     return ParseResult(
         items=items, confidence=confidence, model_used=MODEL_PRIMARY, raw_response=raw
+    )
+
+
+def parse_receipt(
+    client: anthropic.Anthropic,
+    *,
+    image_bytes: bytes,
+    media_type: str,
+) -> ParseResult:
+    return _parse(
+        client,
+        image_bytes=image_bytes,
+        media_type=media_type,
+        system_prompt=SYSTEM_PROMPT,
+        user_text="Parse this receipt.",
+    )
+
+
+def parse_photo(
+    client: anthropic.Anthropic,
+    *,
+    image_bytes: bytes,
+    media_type: str,
+) -> ParseResult:
+    """Count Red Bull cans in an ordinary photo (not a receipt)."""
+    return _parse(
+        client,
+        image_bytes=image_bytes,
+        media_type=media_type,
+        system_prompt=PHOTO_SYSTEM_PROMPT,
+        user_text="Count the Red Bull cans in this photo.",
     )
