@@ -27,7 +27,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Callable
 
-from .receipts import PHOTO_SYSTEM_PROMPT, SYSTEM_PROMPT, ParseResult
+from .receipts import PHOTO_SYSTEM_PROMPT, SYSTEM_PROMPT, ParseResult, json_mode_prompt
 
 # Codex can spin up its own reasoning; give it generous headroom but bound it so
 # a hung CLI can't wedge a request forever.
@@ -56,7 +56,7 @@ class CodexError(RuntimeError):
 
 
 def _build_prompt(mode: str) -> str:
-    base = PHOTO_SYSTEM_PROMPT if mode == "photo" else SYSTEM_PROMPT
+    base = json_mode_prompt(PHOTO_SYSTEM_PROMPT if mode == "photo" else SYSTEM_PROMPT)
     task = (
         "Count the Red Bull cans visible in the attached photo."
         if mode == "photo"

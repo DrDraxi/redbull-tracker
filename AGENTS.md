@@ -109,13 +109,14 @@ selects a backend via the `VISION_PROVIDER` env var:
 | `VISION_PROVIDER` | Module | Auth | Notes |
 |---|---|---|---|
 | `codex` (default) | `codex_vision.py` | `codex login` (Codex/ChatGPT subscription) | Shells out to `codex exec "<prompt>" --image <file> --output-last-message <file> --sandbox read-only --skip-git-repo-check`. No metered API key; requires the `codex` CLI installed + logged in on the host. |
-| `openai` | `openai_vision.py` | `OPENAI_API_KEY` | Calls an OpenAI-compatible `/v1/chat/completions`. Set `OPENAI_BASE_URL` to a local subscription proxy (e.g. EvanZhouDev/openai-oauth) to bill the subscription instead of the API. That proxy is documented for local use only — not for hosted deployment. |
-| `anthropic` | `receipts.py` | `ANTHROPIC_API_KEY` | Original Anthropic vision path (Haiku → Sonnet fallback). |
+| `openai` | `openai_vision.py` | `OPENAI_API_KEY` | Calls an OpenAI-compatible `/v1/chat/completions`. Point `OPENAI_BASE_URL` at a subscription proxy to bill a ChatGPT/Codex subscription instead of a metered API. **Production uses the private `codex-proxy` service** over Railway private networking: `OPENAI_BASE_URL=http://codex.railway.internal:8000/v1`, `OPENAI_API_KEY=dummy`, `OPENAI_MODEL=gpt-5.6-terra`. |
+| `anthropic` | `receipts.py` | `ANTHROPIC_API_KEY` | Anthropic vision path (Haiku → Sonnet). Also the automatic **fallback** for the `codex`/`openai` providers when their call fails and `ANTHROPIC_API_KEY` is set. |
 
 Relevant env vars: `VISION_PROVIDER`, `CODEX_BIN`, `CODEX_MODEL`, `OPENAI_API_KEY`,
 `OPENAI_BASE_URL`, `OPENAI_MODEL`, `ANTHROPIC_API_KEY`. `codex exec` requires the
 prompt *before* its flags, and reuses the auth from `codex login` (use
-`codex login --device-auth` on headless hosts).
+`codex login --device-auth` on headless hosts). The proxy passes model slugs
+through verbatim unless remapped, so `gpt-5.6-terra` reaches the Codex backend as-is.
 
 ## Gotchas
 

@@ -21,7 +21,7 @@ import base64
 from typing import Any, Callable
 
 from .codex_vision import _extract_json, _sanitize_items
-from .receipts import PHOTO_SYSTEM_PROMPT, SYSTEM_PROMPT, ParseResult
+from .receipts import PHOTO_SYSTEM_PROMPT, SYSTEM_PROMPT, ParseResult, json_mode_prompt
 
 _JSON_CONTRACT = (
     'Return ONLY a JSON object of the form '
@@ -36,7 +36,8 @@ class OpenAIVisionError(RuntimeError):
 
 
 def _system_prompt(mode: str) -> str:
-    return PHOTO_SYSTEM_PROMPT if mode == "photo" else SYSTEM_PROMPT
+    base = PHOTO_SYSTEM_PROMPT if mode == "photo" else SYSTEM_PROMPT
+    return json_mode_prompt(base)
 
 
 def parse_via_openai(

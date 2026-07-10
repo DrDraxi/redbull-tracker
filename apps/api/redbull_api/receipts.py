@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import io
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -60,6 +61,22 @@ Confidence:
 - "low" — some cans are blurry / partially hidden but you made a best guess
 - "none" — no Red Bull cans visible, or image unreadable
 """
+
+def json_mode_prompt(prompt: str) -> str:
+    """Adapt a tool-oriented system prompt for a JSON-output provider.
+
+    ``SYSTEM_PROMPT`` / ``PHOTO_SYSTEM_PROMPT`` tell the model to "call the
+    record_redbulls tool" — correct for the Anthropic tool-use path, but noise
+    for the ``codex``/``openai`` providers, which instead ask for a raw JSON
+    object. Strip the tool instruction so those providers get one coherent
+    directive. A no-op if the phrase isn't present.
+    """
+    return re.sub(
+        r"\s*and call the record_redbulls tool with[^.]*",
+        " and report them",
+        prompt,
+    )
+
 
 RECORD_TOOL = {
     "name": "record_redbulls",
