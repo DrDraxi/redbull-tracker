@@ -1,8 +1,6 @@
 import io
-import json
 from unittest.mock import MagicMock
 
-import pytest
 from PIL import Image
 
 from redbull_api.receipts import (
