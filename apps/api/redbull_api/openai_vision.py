@@ -87,7 +87,7 @@ def parse_via_openai(
     try:
         text = call(api_key=api_key, base_url=base_url, model=model, messages=messages)
     except Exception as e:  # network / SDK / auth errors → uniform failure
-        raise OpenAIVisionError(str(e)[:300]) from e
+        raise OpenAIVisionError(_describe_error(e, base_url)) from e
 
     data = _extract_json(text)
     items = _sanitize_items(data.get("items"))
@@ -104,6 +104,21 @@ def parse_via_openai(
         raw_response=data,
         kind=_sanitize_kind(data.get("kind")),
     )
+
+
+def _describe_error(e: Exception, base_url: str) -> str:
+    """Build a diagnosable message: SDK errors like APIConnectionError stringify
+    to just "Connection error." — the actual failure (DNS vs refused vs
+    unreachable) lives in the __cause__ chain, and the target host is otherwise
+    invisible in logs."""
+    detail = f"base_url={base_url or 'openai default'}: {e}"
+    cause = e.__cause__
+    for _ in range(4):
+        if cause is None:
+            break
+        detail += f" <- {type(cause).__name__}: {cause}"
+        cause = cause.__cause__
+    return detail[:500]
 
 
 def _default_caller(*, api_key: str, base_url: str, model: str, messages: list) -> str:
