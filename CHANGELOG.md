@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v4.2.0] - 2026-11-26
+
+### Added
+
+- 3D cans: a tiny CPU ray caster renders each can as a lit, rounded aluminium can with the label wrapped around it, a lid, rim and pull tab
+- Hover pops the can out above the taskbar, tips the lid towards you and sways it gently
+- New cans fall in from above, spinning, and land with a squash-and-bounce
+- Drinking a can pops the tab, tips it back, crushes it into folds and fades it out
+- The empty-stock placeholder is a crushed grey can
+- `--preview <file.bmp>` renders a contact sheet of poses for tuning the look
+- Renderer and animation tests
+
+### Changed
+
+- Rendering only happens while something moves; idle CPU stays at zero and hovering costs well under 1% of a core
+
 ## [v4.1.0] - 2026-11-26
 
 ### Added

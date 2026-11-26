@@ -51,7 +51,10 @@ git submodule update --init --recursive
 ```
 apps/widget/
 ├── Program.cs         # Entry point: RedBullApp.Start() + Widget.Run()
-├── RedBullApp.cs      # Widget UI: one can per Red Bull, hover lift, tooltip, menu
+├── RedBullApp.cs      # Widget UI: one 3D can per Red Bull, visuals sync, tooltip, menu
+├── CanRenderer.cs     # CPU ray caster for the can (label unwrapped from the front art, lid, lighting)
+├── CanMotion.cs       # Hover / add / drink animation curves → CanPose
+├── Preview.cs         # `--preview out.bmp` contact sheet for tuning the look
 ├── CanSources.cs      # ICanSource: OfflineCans (counts.json, per type), ApiCans (polls /api/v1/stock, POST /api/v1/adjust), BrokenCans
 ├── RedBullConfig.cs   # config.json + env overrides, mode resolution
 └── Tests/             # xunit tests for parsing, config and offline counting
@@ -60,6 +63,8 @@ apps/widget/
 - Left-click a can drinks it. Offline: right-click adds `rightClickCan`, Shift+right-click adds `shiftRightClickCan`. Ctrl+right-click (or any right-click in API mode) opens the menu (`WidgetOptions.MenuModifier = Ctrl`).
 - API mode polls every 5 s on the thread pool and posts results to the UI thread. Drinks are optimistic, and the next poll reconciles them.
 - A half-configured API (`apiUrl` without `apiToken`) is shown in the tooltip instead of crashing.
+- 3D cans: each `CanVisual` owns a `PixelCanvas`; `CanRenderer` re-renders it only when its `CanPose` changes, and draw callbacks call `RequestFrame()` only while animating, so idle CPU is zero. The widget sets `OverflowTop` so hovered/falling cans can draw above the taskbar.
+- Tune the look with `RedBullTracker.exe --preview sheet.bmp` (renders rest, hover, add and drink frames large).
 
 ### Data Storage
 

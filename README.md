@@ -6,7 +6,7 @@ A Windows taskbar widget to track your Red Bull consumption.
 
 ## Features
 
-- **Visual tracking**: one can per Red Bull in stock, right on the taskbar
+- **3D cans**: one real-time-rendered can per Red Bull in stock. Hover pops a can out above the taskbar, new cans fall in spinning, drinking one crushes it
 - **Modern Windows 11 look**: crisp Direct2D rendering, cans lift when you hover them, smooth tooltips
 - **Offline or synced**: keep a local count, or sync stock with the Red Bull Tracker API (`apps/api`)
 - **Tiny**: a single ~2 MB native exe, a few MB of memory, no CPU while idle

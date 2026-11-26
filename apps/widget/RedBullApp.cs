@@ -3,28 +3,36 @@ using TaskbarWidget;
 namespace RedBullTracker;
 
 /// <summary>
-/// One can per Red Bull in stock. Hover lifts a can, click drinks it. Offline: right-click adds the
-/// configured can, Shift+right-click the other one; Ctrl+right-click opens the menu.
+/// One 3D can per Red Bull in stock. Hovering pops a can out above the taskbar and tips its lid towards
+/// you; clicking drinks it (tab pops, it tips back, gets crushed, fades); new cans fall in spinning.
+/// Offline: right-click adds the configured can, Shift+right-click the other one; Ctrl+right-click = menu.
 /// </summary>
 public sealed class RedBullApp
 {
     const string AppName = "RedBullTracker";
-    const float CanW = 10, CanH = 26, Lift = 2.5f; // can art is 99×256, so 10×26 keeps the aspect ratio
+    const float CanW = CanMotion.CanW, CanH = CanMotion.CanH;
     const int MaxVisibleCans = 12;
     static readonly TextStyle MoreStyle = new(12, 600);
 
     readonly RedBullConfig _config = new();
-    readonly Dictionary<string, WidgetImage> _icons = new();
-    WidgetImage _generic = null!, _empty = null!;
+    Dictionary<string, CanLabel>? _labels;
+    readonly List<CanVisual> _visuals = new();
+    readonly CanVisual _emptyVisual = new() { Type = "empty" };
+    bool _synced;
+    int _serial;
     ICanSource _source = null!;
     Widget _widget = null!;
 
     public void Start()
     {
         AppKit.SetStartWithWindows(AppName, _config.StartWithWindows);
-        LoadImages();
 
-        _widget = new Widget("RedBull", Build, new WidgetOptions { Menu = BuildMenu, MenuModifier = MenuModifier.Ctrl });
+        _widget = new Widget("RedBull", Build, new WidgetOptions
+        {
+            Menu = BuildMenu,
+            MenuModifier = MenuModifier.Ctrl,
+            OverflowTop = CanMotion.Overflow, // cans pop out above the taskbar
+        });
 
         var (mode, problem) = _config.Mode;
         _source = mode switch
@@ -45,17 +53,32 @@ public sealed class RedBullApp
         }
     }
 
-    void LoadImages()
+    /// <summary>Wrap-around labels unprojected from the front-view can art (needs COM initialised; UI thread).</summary>
+    public static Dictionary<string, CanLabel> LoadLabels()
     {
         var asm = typeof(RedBullApp).Assembly;
-        WidgetImage Load(string name) => WidgetImage.FromResource(asm, $"RedBullTracker.Assets.{name}.png");
-        _icons["default"] = Load("redbull-default");
-        _icons["sugarfree"] = Load("redbull-sugarfree");
-        _generic = Load("redbull-generic");
-        _empty = Load("redbull-empty");
+        CanLabel Load(string name, bool grey = false)
+        {
+            var img = WidgetImage.FromResource(asm, $"RedBullTracker.Assets.{name}.png");
+            var (w, h) = img.NaturalSize;
+            // The art's straight body spans ~3%..95% of its height; above/below are the rounded ends,
+            // which the renderer models as metal neck and base.
+            return CanLabel.FromFrontArt(img.GetPixels(w, h), w, h, (int)(h * 0.03f), (int)(h * 0.95f), grey);
+        }
+        return new Dictionary<string, CanLabel>
+        {
+            ["default"] = Load("redbull-default"),
+            ["sugarfree"] = Load("redbull-sugarfree"),
+            ["generic"] = Load("redbull-generic"),
+            ["empty"] = Load("redbull-default", grey: true),
+        };
     }
 
-    WidgetImage Icon(string type) => _icons.TryGetValue(type, out var i) ? i : _generic;
+    CanLabel Label(string type)
+    {
+        _labels ??= LoadLabels();
+        return _labels.TryGetValue(type, out var l) ? l : _labels["generic"];
+    }
 
     static string DisplayName(string type) => type switch
     {
@@ -74,39 +97,107 @@ public sealed class RedBullApp
         float opacity = src.IsStale && src is not OfflineCans ? 0.45f : 1f;
         bool loading = src is ApiCans { HasLoaded: false } && src.Problem == null;
 
-        if (src.Total == 0)
+        int hidden = SyncVisuals();
+        if (_visuals.Count == 0)
         {
-            ui.Custom(CanW, CanH, (g, s) => g.Image(_empty, 0, -Lift * s.Hover * 0.5f, CanW, CanH, loading ? 0.35f : 0.6f));
+            var empty = _emptyVisual;
+            ui.Custom(CanW, CanH, (g, s) =>
+            {
+                var pose = CanMotion.Empty(s.Hover, g.Time, g.Scale, loading ? 0.3f : 0.55f);
+                DrawCan(g, empty, Label("empty"), pose, 0, s.Hover > 0);
+            });
         }
         else
         {
-            int shown = 0;
-            foreach (var (type, count) in src.ByType.OrderBy(kv => kv.Key, StringComparer.Ordinal))
+            foreach (var v in _visuals)
             {
-                var icon = Icon(type);
-                for (int i = 0; i < count && shown < MaxVisibleCans; i++, shown++)
-                {
-                    string t = type;
-                    ui.Custom(CanW, CanH, (g, s) =>
-                        {
-                            // Lift on hover, dip on press — like picking the can up.
-                            float y = -Lift * s.Hover + 1.5f * s.Pressed;
-                            g.Image(icon, 0, y, CanW, CanH, opacity);
-                        })
-                      .OnClick(() => src.Drink(t))
-                      .Tooltip(DisplayName(t), "Click to drink this one");
-                }
+                var visual = v;
+                ui.Custom(CanW, CanH, (g, s) =>
+                    {
+                        bool animating = CanMotion.Compute(visual, s.Hover, s.Pressed, g.Time, g.Scale, opacity, out var pose, out var shadow);
+                        DrawCan(g, visual, Label(visual.Type), pose, shadow, animating);
+                    })
+                  .OnClick(() => Drink(visual))
+                  .Tooltip(DisplayName(v.Type), "Click to drink this one");
             }
-            if (src.Total > shown)
+            if (hidden > 0)
             {
                 ui.Gap(4);
-                ui.Text($"+{src.Total - shown}", MoreStyle, theme.TextSecondary.WithOpacity(opacity));
+                ui.Text($"+{hidden}", MoreStyle, theme.TextSecondary.WithOpacity(opacity));
             }
         }
 
         if (src.CanAdd) ui.OnRightClick(AddFromClick);
         var (title, body) = Tooltip(src, loading);
         ui.Tooltip(title, body);
+    }
+
+    static void DrawCan(Graphics g, CanVisual v, CanLabel label, in CanPose pose, float shadow, bool animating)
+    {
+        int w = (int)MathF.Ceiling(CanMotion.AreaW * g.Scale), h = (int)MathF.Ceiling(CanMotion.AreaH * g.Scale);
+        if (v.Canvas.Width != w || v.Canvas.Height != h) { v.Canvas.Resize(w, h); v.Last = null; }
+        if (v.Last != pose)
+        {
+            CanRenderer.Render(v.Canvas, label, pose);
+            v.Last = pose;
+        }
+        // Soft contact shadow on the taskbar while the can is lifted.
+        if (shadow > 0.02f)
+            g.FillEllipse(CanW / 2, CanH - 0.5f, 4.2f + 1.6f * shadow, 1.3f, Color.Black.WithOpacity(0.32f * shadow));
+        g.Pixels(v.Canvas, CanMotion.AreaLeft, CanMotion.AreaTop);
+        if (animating) g.RequestFrame();
+    }
+
+    /// <summary>
+    /// Keeps one visual per can (up to <see cref="MaxVisibleCans"/>), so cans keep their animation state across
+    /// rebuilds. New cans (after the first sync) get the fall-in animation. Returns how many cans aren't shown.
+    /// </summary>
+    int SyncVisuals()
+    {
+        var want = new List<(string Type, int Count)>();
+        int budget = MaxVisibleCans, total = 0;
+        foreach (var (type, count) in _source.ByType.OrderBy(kv => kv.Key, StringComparer.Ordinal))
+        {
+            total += count;
+            int n = Math.Min(count, budget);
+            budget -= n;
+            want.Add((type, n));
+        }
+
+        double now = Graphics.Now;
+        foreach (var (type, n) in want)
+        {
+            int have = _visuals.Count(v => v.Type == type);
+            for (; have < n; have++)
+                _visuals.Add(new CanVisual
+                {
+                    Type = type,
+                    Born = _synced ? now : double.NaN,
+                    YawOffset = ((_serial++ * 7919) % 13 - 6) * 0.035f, // ±12° of variety
+                });
+            for (int i = _visuals.Count - 1; i >= 0 && have > n; i--)
+                if (_visuals[i].Type == type && !_visuals[i].IsDrinking) { _visuals.RemoveAt(i); have--; }
+        }
+        _visuals.RemoveAll(v => !v.IsDrinking && want.All(w => w.Type != v.Type));
+        // Stable order: by type, then by age.
+        var ordered = _visuals.OrderBy(v => v.Type, StringComparer.Ordinal).ToList();
+        _visuals.Clear(); _visuals.AddRange(ordered);
+        _synced = true;
+        return Math.Max(0, total - _visuals.Count);
+    }
+
+    void Drink(CanVisual v)
+    {
+        if (v.IsDrinking) return;
+        v.DrinkStart = Graphics.Now;
+        _widget.Invalidate(); // start the frame clock
+        // The count changes when the animation is over, so the can stays in place while it plays.
+        _widget.SetTimeout(TimeSpan.FromSeconds(CanMotion.DrinkSeconds), () =>
+        {
+            _visuals.Remove(v);
+            _source.Drink(v.Type);
+            _widget.Invalidate();
+        });
     }
 
     (string, string) Tooltip(ICanSource src, bool loading)
