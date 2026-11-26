@@ -6,8 +6,9 @@ namespace RedBullTracker;
 public enum CanMode { Offline, Api, Misconfigured }
 
 /// <summary>
-/// %LOCALAPPDATA%\RedBullTracker\config.json (same keys as before: canType, apiUrl, apiToken,
-/// startWithWindows). REDBULL_API_URL / REDBULL_API_TOKEN environment variables override the file.
+/// %LOCALAPPDATA%\RedBullTracker\config.json: rightClickCan, shiftRightClickCan, apiUrl, apiToken,
+/// startWithWindows (canType is only used to import an old count.txt). REDBULL_API_URL /
+/// REDBULL_API_TOKEN environment variables override the file.
 /// </summary>
 public sealed class RedBullConfig
 {
@@ -19,19 +20,36 @@ public sealed class RedBullConfig
         _json = new JsonConfig(Path.Combine(DataDir, "config.json"));
         if (!_json.Exists)
         {
-            _json.Root["canType"] = "default";
+            _json.Root["rightClickCan"] = "default";
+            _json.Root["shiftRightClickCan"] = "sugarfree";
             _json.Root["apiUrl"] = null;
             _json.Root["apiToken"] = null;
             _json.Root["startWithWindows"] = true;
             _json.Save();
         }
+        else if (_json.LoadError == null && (_json["rightClickCan"] == null || _json["shiftRightClickCan"] == null))
+        {
+            // Older config: add the new keys so they're discoverable in the file.
+            if (_json["rightClickCan"] == null) _json.Set("rightClickCan", "default");
+            if (_json["shiftRightClickCan"] == null) _json.Set("shiftRightClickCan", "sugarfree");
+            _json.Save();
+        }
     }
+
+    /// <summary>Re-reads config.json (cheap; called before acting on it so edits apply without a restart).</summary>
+    public void Reload() => _json.Reload();
 
     public string DataDir { get; }
     public string FilePath => _json.Path;
-    public string CountFile => Path.Combine(DataDir, "count.txt");
+    public string CountsFile => Path.Combine(DataDir, "counts.json");
+    /// <summary>Pre-v4.1 single-type counter, imported once into counts.json.</summary>
+    public string LegacyCountFile => Path.Combine(DataDir, "count.txt");
+    public string LegacyCanType => _json.GetString("canType") ?? "default";
 
-    public string CanType => _json.GetString("canType") ?? "default";
+    /// <summary>Can type added by a plain right-click. Default "default" (regular Red Bull).</summary>
+    public string RightClickCan => _json.GetString("rightClickCan")?.Trim().ToLowerInvariant() ?? "default";
+    /// <summary>Can type added by Shift+right-click. Default "sugarfree".</summary>
+    public string ShiftRightClickCan => _json.GetString("shiftRightClickCan")?.Trim().ToLowerInvariant() ?? "sugarfree";
     public bool StartWithWindows => _json.GetBool("startWithWindows", true);
 
     public string? ApiUrl => First(Environment.GetEnvironmentVariable("REDBULL_API_URL"), _json.GetString("apiUrl"));

@@ -14,42 +14,81 @@ public interface ICanSource
     bool IsStale { get; }
     string? Problem { get; }
     event Action? Changed;
-    void Add();
+    void Add(string type);
     void Drink(string type);
     void Refresh();
 }
 
-/// <summary>Local counter persisted in count.txt (one configured can type).</summary>
+/// <summary>
+/// Local per-type counts in counts.json (e.g. {"default": 2, "sugarfree": 1}).
+/// On first run the old single-type count.txt is imported as <c>legacyType</c> (count.txt itself is left alone).
+/// </summary>
 public sealed class OfflineCans : ICanSource
 {
-    readonly string _countFile, _type;
-    int _count;
+    readonly string _file;
+    readonly SortedDictionary<string, int> _counts = new(StringComparer.Ordinal);
 
-    public OfflineCans(string countFile, string type)
+    public OfflineCans(string countsFile, string? legacyCountFile = null, string legacyType = "default")
     {
-        _countFile = countFile;
-        _type = type;
-        try { _count = int.TryParse(File.ReadAllText(countFile).Trim(), out var c) ? Math.Max(0, c) : 0; }
-        catch { _count = 0; }
+        _file = countsFile;
+        if (File.Exists(countsFile))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(File.ReadAllBytes(countsFile));
+                if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                    foreach (var p in doc.RootElement.EnumerateObject())
+                        if (p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt32(out var n) && n > 0)
+                            _counts[Normalize(p.Name)] = n;
+            }
+            catch { /* corrupt file: start empty */ }
+        }
+        else if (legacyCountFile != null && File.Exists(legacyCountFile))
+        {
+            try
+            {
+                if (int.TryParse(File.ReadAllText(legacyCountFile).Trim(), out var n) && n > 0)
+                {
+                    _counts[Normalize(legacyType)] = n;
+                    Save();
+                }
+            }
+            catch { }
+        }
     }
 
-    public IReadOnlyDictionary<string, int> ByType =>
-        _count > 0 ? new Dictionary<string, int> { [_type] = _count } : new Dictionary<string, int>();
-    public int Total => _count;
+    public IReadOnlyDictionary<string, int> ByType => new Dictionary<string, int>(_counts);
+    public int Total => _counts.Values.Sum();
     public bool CanAdd => true;
     public bool IsStale => false;
     public string? Problem => null;
     public event Action? Changed;
 
-    public void Add() => Set(_count + 1);
-    public void Drink(string type) { if (_count > 0) Set(_count - 1); }
+    public void Add(string type)
+    {
+        type = Normalize(type);
+        _counts[type] = _counts.GetValueOrDefault(type) + 1;
+        Save();
+        Changed?.Invoke();
+    }
+
+    public void Drink(string type)
+    {
+        type = Normalize(type);
+        if (!_counts.TryGetValue(type, out var n) || n <= 0) return;
+        if (n == 1) _counts.Remove(type); else _counts[type] = n - 1;
+        Save();
+        Changed?.Invoke();
+    }
+
     public void Refresh() { }
 
-    void Set(int value)
+    static string Normalize(string type) => string.IsNullOrWhiteSpace(type) ? "default" : type.Trim().ToLowerInvariant();
+
+    void Save()
     {
-        _count = value;
-        try { AppKit.WriteAllTextAtomic(_countFile, value.ToString()); } catch { }
-        Changed?.Invoke();
+        var body = string.Join(",\n", _counts.Select(kv => $"  \"{JsonEncodedText.Encode(kv.Key)}\": {kv.Value}"));
+        try { AppKit.WriteAllTextAtomic(_file, _counts.Count == 0 ? "{}" : "{\n" + body + "\n}"); } catch { }
     }
 }
 
@@ -83,7 +122,7 @@ public sealed class ApiCans : ICanSource
 
     public string DashboardUrl => _base.GetLeftPart(UriPartial.Authority) + "/";
 
-    public void Add() { }
+    public void Add(string type) { }
 
     public void Refresh()
     {
@@ -175,7 +214,7 @@ public sealed class BrokenCans(string problem) : ICanSource
     public bool IsStale => true;
     public string? Problem => problem;
     public event Action? Changed { add { } remove { } }
-    public void Add() { }
+    public void Add(string type) { }
     public void Drink(string type) { }
     public void Refresh() { }
 }

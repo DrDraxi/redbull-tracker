@@ -3,7 +3,8 @@ using TaskbarWidget;
 namespace RedBullTracker;
 
 /// <summary>
-/// One can per Red Bull in stock. Hover lifts a can, click drinks it; right-click adds one (offline mode).
+/// One can per Red Bull in stock. Hover lifts a can, click drinks it. Offline: right-click adds the
+/// configured can, Shift+right-click the other one; Ctrl+right-click opens the menu.
 /// </summary>
 public sealed class RedBullApp
 {
@@ -23,12 +24,12 @@ public sealed class RedBullApp
         AppKit.SetStartWithWindows(AppName, _config.StartWithWindows);
         LoadImages();
 
-        _widget = new Widget("RedBull", Build, new WidgetOptions { Menu = BuildMenu });
+        _widget = new Widget("RedBull", Build, new WidgetOptions { Menu = BuildMenu, MenuModifier = MenuModifier.Ctrl });
 
         var (mode, problem) = _config.Mode;
         _source = mode switch
         {
-            CanMode.Offline => new OfflineCans(_config.CountFile, _config.CanType),
+            CanMode.Offline => new OfflineCans(_config.CountsFile, _config.LegacyCountFile, _config.LegacyCanType),
             CanMode.Api => new ApiCans(_config.ApiUrl!, _config.ApiToken!, _widget.Post),
             _ => new BrokenCans(problem ?? "Invalid configuration"),
         };
@@ -93,7 +94,7 @@ public sealed class RedBullApp
                             g.Image(icon, 0, y, CanW, CanH, opacity);
                         })
                       .OnClick(() => src.Drink(t))
-                      .Tooltip(DisplayName(t), "Click to drink this one" + (src.CanAdd ? "\nRight-click to add a can" : ""));
+                      .Tooltip(DisplayName(t), "Click to drink this one");
                 }
             }
             if (src.Total > shown)
@@ -103,7 +104,7 @@ public sealed class RedBullApp
             }
         }
 
-        if (src.CanAdd) ui.OnRightClick(src.Add);
+        if (src.CanAdd) ui.OnRightClick(AddFromClick);
         var (title, body) = Tooltip(src, loading);
         ui.Tooltip(title, body);
     }
@@ -123,17 +124,32 @@ public sealed class RedBullApp
             if (src.Problem != null) lines.Add($"Offline — {src.Problem}");
             lines.Add("Synced with your Red Bull Tracker server");
         }
-        lines.Add(src.CanAdd ? "Click a can to drink it · right-click to add" : "Click a can to drink it");
+        lines.Add("Click a can to drink it");
+        if (src.CanAdd)
+        {
+            lines.Add($"Right-click: add {DisplayName(_config.RightClickCan)}");
+            lines.Add($"Shift+right-click: add {DisplayName(_config.ShiftRightClickCan)}");
+        }
+        lines.Add("Ctrl+right-click: options");
 
         string title = src.Total == 1 ? "1 Red Bull" : $"{src.Total} Red Bulls";
         return (title, string.Join("\n", lines));
     }
 
+    void AddFromClick()
+    {
+        _config.Reload(); // edits to rightClickCan / shiftRightClickCan apply immediately
+        _source.Add(Input.Shift ? _config.ShiftRightClickCan : _config.RightClickCan);
+    }
+
     void BuildMenu(MenuBuilder m)
     {
         if (_source.CanAdd)
-            m.Item("Add a can", _source.Add)
-             .Item("Drink a can", () => { if (_source.ByType.Count > 0) _source.Drink(_source.ByType.Keys.First()); }, _source.Total > 0);
+        {
+            _config.Reload();
+            foreach (var type in new[] { _config.RightClickCan, _config.ShiftRightClickCan }.Distinct())
+                m.Item($"Add {DisplayName(type)}", () => _source.Add(type));
+        }
         if (_source is ApiCans api)
             m.Item("Refresh now", api.Refresh)
              .Item("Open dashboard", () => AppKit.Open(api.DashboardUrl));

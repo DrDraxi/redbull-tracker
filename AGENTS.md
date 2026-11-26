@@ -52,20 +52,21 @@ git submodule update --init --recursive
 apps/widget/
 ├── Program.cs         # Entry point: RedBullApp.Start() + Widget.Run()
 ├── RedBullApp.cs      # Widget UI: one can per Red Bull, hover lift, tooltip, menu
-├── CanSources.cs      # ICanSource: OfflineCans (count.txt), ApiCans (polls /api/v1/stock, POST /api/v1/adjust), BrokenCans
+├── CanSources.cs      # ICanSource: OfflineCans (counts.json, per type), ApiCans (polls /api/v1/stock, POST /api/v1/adjust), BrokenCans
 ├── RedBullConfig.cs   # config.json + env overrides, mode resolution
 └── Tests/             # xunit tests for parsing, config and offline counting
 ```
 
-- Left-click a can drinks it. Right-click adds one (offline mode). Shift+right-click (or right-click in API mode) opens the menu.
+- Left-click a can drinks it. Offline: right-click adds `rightClickCan`, Shift+right-click adds `shiftRightClickCan`. Ctrl+right-click (or any right-click in API mode) opens the menu (`WidgetOptions.MenuModifier = Ctrl`).
 - API mode polls every 5 s on the thread pool and posts results to the UI thread. Drinks are optimistic, and the next poll reconciles them.
 - A half-configured API (`apiUrl` without `apiToken`) is shown in the tooltip instead of crashing.
 
 ### Data Storage
 
 All data stored in `%LOCALAPPDATA%\RedBullTracker\`:
-- `config.json`: `canType` (`default`/`sugarfree`), `apiUrl`, `apiToken`, `startWithWindows`. `REDBULL_API_URL` / `REDBULL_API_TOKEN` override.
-- `count.txt`: offline count
+- `config.json`: `rightClickCan` (default `default`), `shiftRightClickCan` (default `sugarfree`), `apiUrl`, `apiToken`, `startWithWindows`. `REDBULL_API_URL` / `REDBULL_API_TOKEN` override. Legacy `canType` is only used to import `count.txt`.
+- `counts.json`: offline counts per can type
+- `count.txt`: pre-v4.1 single-type count, imported into `counts.json` once
 
 ### API Vision Recognition (receipts & photos)
 

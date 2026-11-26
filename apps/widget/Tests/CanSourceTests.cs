@@ -74,52 +74,61 @@ public class ModeTests
 public sealed class OfflineCansTests : IDisposable
 {
     readonly string _dir = Directory.CreateTempSubdirectory("rbt-test-").FullName;
-    string CountFile => Path.Combine(_dir, "count.txt");
+    string CountsFile => Path.Combine(_dir, "counts.json");
+    string LegacyFile => Path.Combine(_dir, "count.txt");
 
     public void Dispose() => Directory.Delete(_dir, recursive: true);
 
     [Fact]
-    public void ReadsExistingCount()
+    public void ImportsLegacyCountTxtAsConfiguredType()
     {
-        File.WriteAllText(CountFile, " 4 \n");
-        var cans = new OfflineCans(CountFile, "sugarfree");
+        File.WriteAllText(LegacyFile, " 4 \n");
+        var cans = new OfflineCans(CountsFile, LegacyFile, "sugarfree");
         Assert.Equal(4, cans.Total);
         Assert.Equal(4, cans.ByType["sugarfree"]);
+        Assert.True(File.Exists(CountsFile));
+        Assert.Equal(4, new OfflineCans(CountsFile, LegacyFile, "default").ByType["sugarfree"]); // imported once
     }
 
     [Fact]
-    public void MissingOrCorruptFileStartsAtZero()
+    public void MissingOrCorruptFilesStartAtZero()
     {
-        Assert.Equal(0, new OfflineCans(CountFile, "default").Total);
-        File.WriteAllText(CountFile, "lots");
-        Assert.Equal(0, new OfflineCans(CountFile, "default").Total);
+        Assert.Equal(0, new OfflineCans(CountsFile, LegacyFile).Total);
+        File.WriteAllText(LegacyFile, "lots");
+        Assert.Equal(0, new OfflineCans(CountsFile, LegacyFile).Total);
+        File.WriteAllText(CountsFile, "{ nope");
+        Assert.Equal(0, new OfflineCans(CountsFile, LegacyFile).Total);
     }
 
     [Fact]
-    public void AddAndDrinkPersistAndNotify()
+    public void TracksTypesSeparatelyAndPersists()
     {
-        var cans = new OfflineCans(CountFile, "default");
+        var cans = new OfflineCans(CountsFile);
         int changes = 0;
         cans.Changed += () => changes++;
 
-        cans.Add(); cans.Add(); cans.Drink("default");
+        cans.Add("default"); cans.Add("sugarfree"); cans.Add("Sugarfree "); cans.Drink("default");
 
-        Assert.Equal(1, cans.Total);
-        Assert.Equal(3, changes);
-        Assert.Equal("1", File.ReadAllText(CountFile));
-        Assert.Equal(1, new OfflineCans(CountFile, "default").Total);
+        Assert.Equal(2, cans.Total);
+        Assert.Equal(4, changes);
+        Assert.False(cans.ByType.ContainsKey("default"));
+        Assert.Equal(2, cans.ByType["sugarfree"]);
+
+        var reloaded = new OfflineCans(CountsFile);
+        Assert.Equal(2, reloaded.ByType["sugarfree"]);
+        Assert.Single(reloaded.ByType);
     }
 
     [Fact]
-    public void DrinkingNeverGoesNegative()
+    public void DrinkingAMissingTypeDoesNothing()
     {
-        var cans = new OfflineCans(CountFile, "default");
+        var cans = new OfflineCans(CountsFile);
+        cans.Add("sugarfree");
         int changes = 0;
         cans.Changed += () => changes++;
         cans.Drink("default");
-        Assert.Equal(0, cans.Total);
+        Assert.Equal(1, cans.Total);
         Assert.Equal(0, changes);
-        Assert.Empty(cans.ByType);
     }
 }
 
@@ -133,8 +142,31 @@ public sealed class ConfigTests : IDisposable
     {
         var cfg = new RedBullConfig(_dir);
         Assert.True(File.Exists(cfg.FilePath));
-        Assert.Equal("default", cfg.CanType);
+        Assert.Equal("default", cfg.RightClickCan);
+        Assert.Equal("sugarfree", cfg.ShiftRightClickCan);
         Assert.True(cfg.StartWithWindows);
+    }
+
+    [Fact]
+    public void OlderConfigGainsClickKeysAndKeepsSettings()
+    {
+        File.WriteAllText(Path.Combine(_dir, "config.json"), """{ "canType": "sugarfree", "startWithWindows": false }""");
+        var cfg = new RedBullConfig(_dir);
+        Assert.Equal("sugarfree", cfg.LegacyCanType);
+        Assert.False(cfg.StartWithWindows);
+        var saved = File.ReadAllText(cfg.FilePath);
+        Assert.Contains("rightClickCan", saved);
+        Assert.Contains("shiftRightClickCan", saved);
+    }
+
+    [Fact]
+    public void ClickMappingCanBeSwapped()
+    {
+        File.WriteAllText(Path.Combine(_dir, "config.json"),
+            """{ "rightClickCan": "Sugarfree", "shiftRightClickCan": "default" }""");
+        var cfg = new RedBullConfig(_dir);
+        Assert.Equal("sugarfree", cfg.RightClickCan);
+        Assert.Equal("default", cfg.ShiftRightClickCan);
     }
 
     [Fact]
@@ -143,7 +175,7 @@ public sealed class ConfigTests : IDisposable
         File.WriteAllText(Path.Combine(_dir, "config.json"),
             """{ "CanType": "sugarfree", "startWithWindows": true, "myNote": "keep me" }""");
         var cfg = new RedBullConfig(_dir);
-        Assert.Equal("sugarfree", cfg.CanType);
+        Assert.Equal("sugarfree", cfg.LegacyCanType);
 
         cfg.SetStartWithWindows(false);
         var saved = File.ReadAllText(cfg.FilePath);

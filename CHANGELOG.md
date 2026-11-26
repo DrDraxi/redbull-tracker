@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v4.1.0] - 2026-11-26
+
+### Added
+
+- Offline mode tracks each can type separately (`counts.json`); the old `count.txt` is imported automatically
+- Configurable right-click / Shift+right-click cans: `rightClickCan` (default Red Bull) and `shiftRightClickCan` (default Sugarfree)
+- Menu items to add each configured can type
+
+### Changed
+
+- The menu moved to Ctrl+right-click (Shift+right-click now adds a can)
+
 ## [v4.0.0] - 2026-11-26
 
 ### Changed (widget)
