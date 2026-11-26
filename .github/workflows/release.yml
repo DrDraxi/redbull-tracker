@@ -21,10 +21,10 @@ jobs:
         with:
           submodules: true
 
-      - name: Setup .NET 8
+      - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Restore dependencies
         run: dotnet restore RedBullTracker.sln
@@ -66,16 +66,12 @@ jobs:
           $section | Out-File -FilePath "release_notes.txt" -Encoding utf8
 
       # 1. Build portable single-file exe
-      - name: Publish Single File exe
+      - name: Publish NativeAOT exe
         run: |
           dotnet publish apps/widget/RedBullTracker.csproj `
             --configuration Release `
             --runtime ${{ env.RID }} `
-            --self-contained true `
             -p:Platform=${{ env.PLATFORM }} `
-            -p:PublishSingleFile=true `
-            -p:IncludeNativeLibrariesForSelfExtract=true `
-            -p:WindowsPackageType=None `
             -p:Version=${{ steps.version.outputs.VERSION }} `
             -o publish/single
 
@@ -95,10 +91,7 @@ jobs:
           dotnet publish apps/widget/RedBullTracker.csproj `
             --configuration Release `
             --runtime ${{ env.RID }} `
-            --self-contained true `
             -p:Platform=${{ env.PLATFORM }} `
-            -p:PublishSingleFile=false `
-            -p:WindowsPackageType=None `
             -p:Version=${{ steps.version.outputs.VERSION }} `
             -o publish/zip
 
@@ -108,7 +101,7 @@ jobs:
           $tag = "${{ github.ref_name }}"
           if (-not $tag) { $tag = "dev" }
           $asset = "RedBullTracker-$tag-${{ env.RID }}.zip"
-          Compress-Archive -Path "publish/zip/*" -DestinationPath $asset
+          Compress-Archive -Path "publish/zip/*.exe" -DestinationPath $asset
           echo "ZIP_ASSET=$asset" >> $env:GITHUB_OUTPUT
         id: pkg-zip
 

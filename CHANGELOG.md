@@ -5,7 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [v4.0.0] - 2026-11-26
+
+### Changed (widget)
+
+- Complete rewrite on the new TaskbarWidget library: native AOT exe built on .NET 10 (~2 MB instead of ~14 MB, roughly a third of the memory, zero idle CPU)
+- Modern Windows 11 look: Direct2D rendering, cans drawn at the correct aspect ratio with high-quality scaling, cans lift on hover and dip when clicked, hover pill and fade-in tooltips
+- Drinking a can in API mode is optimistic (disappears instantly) and reconciles with the server
+- More than 12 cans collapse into a "+N" counter
+
+### Added (widget)
+
+- Right-click menu (Shift+right-click in offline mode): Add/Drink, Refresh, Open dashboard, Edit settings, Start with Windows, Exit
+- Refreshes after waking from sleep; stale data is shown dimmed
+
+### Fixed (widget)
+
+- Widget could jump to the top of the screen (explorer restart, display/DPI change, auto-hide taskbar)
+- Widgets could swap places or leave gaps "randomly" when several widgets were running
+- An `apiUrl` without `apiToken` crashed the app on startup; the problem is now shown in the tooltip
+- Widget hid itself when clicking the desktop
 
 ### Added
 

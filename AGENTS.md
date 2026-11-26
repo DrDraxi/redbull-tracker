@@ -4,96 +4,68 @@ This file provides guidance to OpenAI Codex and other AI coding agents when work
 
 ## Project Overview
 
-RedBull Tracker is a Windows taskbar widget that tracks Red Bull consumption. It displays cans visually in the taskbar, allowing quick add/remove with mouse clicks. Uses pure Win32 GDI rendering via the TaskbarWidget submodule. Supports offline mode with local persistence and configurable can types.
+RedBull Tracker is a Windows taskbar widget that tracks Red Bull consumption. It displays cans visually in the taskbar, allowing quick add/remove with mouse clicks. Rendered with Direct2D via the TaskbarWidget submodule and published as a NativeAOT exe. Supports offline mode with local persistence and configurable can types.
 
 ## Setup
 
-After cloning, initialize the submodule before building:
-
-```bash
-git submodule update --init --recursive
-```
-
 Requirements:
 
-- Windows 10/11 (the widget is a Win32 GDI app)
-- .NET 8.0 SDK
+- Windows 10/11
+- .NET 10 SDK, plus the Visual Studio "Desktop development with C++" workload for NativeAOT publishing
 
 ## Build Commands
 
 ```bash
-# Build the solution
+# Build / run (JIT, fast iteration)
 dotnet build -p:Platform=x64
-
-# Build release
-dotnet build --configuration Release -p:Platform=x64
-
-# Run the app (x64)
 dotnet run --project apps/widget/RedBullTracker.csproj -p:Platform=x64
 
-# Publish single-file exe (x64)
-dotnet publish apps/widget/RedBullTracker.csproj --configuration Release --runtime win-x64 --self-contained true -p:Platform=x64 -p:PublishSingleFile=true -p:WindowsPackageType=None -o publish
+# Publish the release exe: NativeAOT, single ~2 MB native file
+# (needs the VS "Desktop development with C++" workload; vswhere.exe must be on PATH)
+dotnet publish apps/widget/RedBullTracker.csproj -c Release -r win-x64 -p:Platform=x64 -o publish
+
+# Build against a local taskbar-widget checkout instead of the submodule
+dotnet build apps/widget/RedBullTracker.csproj -p:Platform=x64 -p:TaskbarWidgetDir=../taskbar-widget
+```
+
+```bash
+# Widget tests
+dotnet test apps/widget/Tests/RedBullTracker.Tests.csproj -p:Platform=x64
 ```
 
 ## Architecture
 
 ### Solution Structure
 
-- **RedBullTracker** (`apps/widget/`) - Win32 GDI app with taskbar widget
-- **API** (`apps/api/`) - Flask + SQLite backend (planned; see `docs/superpowers/specs/2026-05-18-api-monorepo-receipt-tracking-design.md`)
-- **TaskbarWidget** (`lib/taskbar-widget/`) - Git submodule for immediate-mode GDI widget toolkit
+- **RedBullTracker** (`apps/widget/`): the widget app, .NET 10 NativeAOT
+- **API** (`apps/api/`): Flask + SQLite backend
+- **TaskbarWidget** (`lib/taskbar-widget/`): git submodule. Direct2D-rendered taskbar widget toolkit with shared, deterministic cross-widget positioning
+
+After cloning, initialize the submodule:
+```bash
+git submodule update --init --recursive
+```
 
 ### Key Components
 
 ```
 apps/widget/
-├── Program.cs              # Entry point, creates services, runs message loop
-├── Widget/
-│   └── RedBullWidget.cs    # Render callback with can images + click handlers
-├── Services/
-│   ├── IRedBullService.cs         # Interface for count operations
-│   ├── OfflineRedBullService.cs   # Local counter with file persistence
-│   ├── SettingsService.cs         # Config and count persistence
-│   └── StartupService.cs          # Windows startup registry
-└── Models/
-    ├── RedBull.cs                 # RedBullCount record
-    └── AppConfig.cs               # Configuration model
+├── Program.cs         # Entry point: RedBullApp.Start() + Widget.Run()
+├── RedBullApp.cs      # Widget UI: one can per Red Bull, hover lift, tooltip, menu
+├── CanSources.cs      # ICanSource: OfflineCans (count.txt), ApiCans (polls /api/v1/stock, POST /api/v1/adjust), BrokenCans
+├── RedBullConfig.cs   # config.json + env overrides, mode resolution
+└── Tests/             # xunit tests for parsing, config and offline counting
 ```
 
-### Widget System
-
-RedBullWidget uses the `TaskbarWidget.Widget` API (immediate-mode Win32 GDI):
-
-1. Loads can images via `WidgetImage.FromFile()` from `Assets/` directory
-2. Creates `new Widget("RedBull", render: ctx => { ... })` with a render callback
-3. Render callback draws can images horizontally using `ctx.Panel()` and `h.DrawImage()`
-4. Left-click removes a can, right-click adds a can (via `p.OnClick()` / `p.OnRightClick()`)
-5. `widget.Invalidate()` re-renders when `IRedBullService.CountChanged` fires
-6. `Widget.RunMessageLoop()` runs the Win32 message loop
-
-### Services
-
-- **OfflineRedBullService**: Manages count with file persistence, fires `CountChanged` event
-- **SettingsService**: Loads/saves `config.json` and `count.txt`
-- **StartupService**: Manages Windows startup via registry
+- Left-click a can drinks it. Right-click adds one (offline mode). Shift+right-click (or right-click in API mode) opens the menu.
+- API mode polls every 5 s on the thread pool and posts results to the UI thread. Drinks are optimistic, and the next poll reconciles them.
+- A half-configured API (`apiUrl` without `apiToken`) is shown in the tooltip instead of crashing.
 
 ### Data Storage
 
 All data stored in `%LOCALAPPDATA%\RedBullTracker\`:
-
-- `config.json` - App configuration
-- `count.txt` - Current Red Bull count
-
-### Configuration Options
-
-```json
-{
-  "canType": "default",      // "default" or "sugarfree"
-  "apiUrl": null,            // Future: API URL for online mode
-  "useOnlineMode": false,    // Future: Enable online sync
-  "startWithWindows": true   // Launch on Windows startup
-}
-```
+- `config.json`: `canType` (`default`/`sugarfree`), `apiUrl`, `apiToken`, `startWithWindows`. `REDBULL_API_URL` / `REDBULL_API_TOKEN` override.
+- `count.txt`: offline count
 
 ### API Vision Recognition (receipts & photos)
 
@@ -184,7 +156,7 @@ Follow [Semantic Versioning](https://semver.org/):
 ## CI/CD
 
 - **CI** (`.github/workflows/ci-widget.yml`): Runs on widget-related changes (pushes to main, all PRs). Builds debug and release, uploads portable exe artifact.
-- **Release** (`.github/workflows/release.yml`): Runs on version tags. Builds single-file exe and zip, extracts changelog notes, creates GitHub release with artifacts.
+- **Release** (`.github/workflows/release.yml`): Runs on version tags. Builds the NativeAOT exe and zip, extracts changelog notes, creates GitHub release with artifacts.
 
 ## Commit Guidelines
 
