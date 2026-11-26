@@ -26,7 +26,6 @@ public static class Preview
         // Row 1: rest poses + hover ramp
         foreach (var t in new[] { "default", "sugarfree" })
             Add(t, v => { CanMotion.Compute(v, 0, 0, 0, scale, 1, out var p, out _); return (true, p); });
-        frames.Add(("empty", () => CanMotion.Empty(0, 0, scale, 0.55f)));
         foreach (var h in new[] { 0.25f, 0.5f, 0.75f, 1f })
             Add("default", v => { CanMotion.Compute(v, h, 0, 0.3, scale, 1, out var p, out _); return (true, p); });
         Add("sugarfree", v => { CanMotion.Compute(v, 1, 0, 1.1, scale, 1, out var p, out _); return (true, p); });

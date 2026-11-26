@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v4.2.1] - 2026-11-26
+
+### Changed
+
+- The empty-stock placeholder is the dark can silhouette again (instead of a crushed grey can)
+
 ## [v4.2.0] - 2026-11-26
 
 ### Added
@@ -13,7 +19,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Hover pops the can out above the taskbar, tips the lid towards you and sways it gently
 - New cans fall in from above, spinning, and land with a squash-and-bounce
 - Drinking a can pops the tab, tips it back, crushes it into folds and fades it out
-- The empty-stock placeholder is a crushed grey can
 - `--preview <file.bmp>` renders a contact sheet of poses for tuning the look
 - Renderer and animation tests
 

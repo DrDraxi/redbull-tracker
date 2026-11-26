@@ -121,14 +121,6 @@ public static class CanMotion
         return animating;
     }
 
-    /// <summary>The empty-stock placeholder: a crushed, grey can.</summary>
-    public static CanPose Empty(float hover, double now, float scale, float opacity)
-    {
-        var v = new CanVisual { Type = "", YawOffset = -0.3f };
-        Compute(v, hover * 0.5f, 0, now, scale, opacity, out var pose, out _);
-        return pose with { Crumple = 0.45f, SquashY = pose.SquashY * 0.72f, Bulge = 1.1f, TabOpen = 1 };
-    }
-
     static float Smooth(float t) { t = Math.Clamp(t, 0, 1); return t * t * (3 - 2 * t); }
     static float Lerp(float a, float b, float t) => a + (b - a) * t;
 }

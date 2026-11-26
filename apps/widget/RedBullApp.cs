@@ -17,7 +17,7 @@ public sealed class RedBullApp
     readonly RedBullConfig _config = new();
     Dictionary<string, CanLabel>? _labels;
     readonly List<CanVisual> _visuals = new();
-    readonly CanVisual _emptyVisual = new() { Type = "empty" };
+    WidgetImage? _emptyImage; // dark can silhouette shown when nothing is in stock
     bool _synced;
     int _serial;
     ICanSource _source = null!;
@@ -70,7 +70,6 @@ public sealed class RedBullApp
             ["default"] = Load("redbull-default"),
             ["sugarfree"] = Load("redbull-sugarfree"),
             ["generic"] = Load("redbull-generic"),
-            ["empty"] = Load("redbull-default", grey: true),
         };
     }
 
@@ -100,12 +99,10 @@ public sealed class RedBullApp
         int hidden = SyncVisuals();
         if (_visuals.Count == 0)
         {
-            var empty = _emptyVisual;
-            ui.Custom(CanW, CanH, (g, s) =>
-            {
-                var pose = CanMotion.Empty(s.Hover, g.Time, g.Scale, loading ? 0.3f : 0.55f);
-                DrawCan(g, empty, Label("empty"), pose, 0, s.Hover > 0);
-            });
+            // Nothing in stock: the flat can "shadow", lifting slightly on hover.
+            _emptyImage ??= WidgetImage.FromResource(typeof(RedBullApp).Assembly, "RedBullTracker.Assets.redbull-empty.png");
+            var empty = _emptyImage;
+            ui.Custom(CanW, CanH, (g, s) => g.Image(empty, 0, -1.25f * s.Hover, CanW, CanH, loading ? 0.35f : 0.6f));
         }
         else
         {
